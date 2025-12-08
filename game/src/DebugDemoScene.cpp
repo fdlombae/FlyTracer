@@ -109,7 +109,7 @@ void DebugDemoScene::OnUpdate(float deltaTime) {
 void DebugDemoScene::OnInput(const InputState& input) {
     // Camera orbit with right mouse
     if (input.rightMouseDown) {
-        m_cameraYaw += input.mouseDeltaX * m_mouseSensitivity;
+        m_cameraYaw -= input.mouseDeltaX * m_mouseSensitivity;
         m_cameraPitch += input.mouseDeltaY * m_mouseSensitivity;
         m_cameraPitch = std::clamp(m_cameraPitch, -1.4f, 1.4f);
     }
