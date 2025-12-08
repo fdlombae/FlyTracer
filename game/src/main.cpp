@@ -1,6 +1,7 @@
 #include "Application.h"
 #include "Config.h"
 #include "TestBoxScene.h"
+#include "DebugDemoScene.h"
 #include <iostream>
 #include <memory>
 #include <string_view>
@@ -16,9 +17,20 @@ void printHelp() {
         "  --width <N>      Window width (default: 1280)\n"
         "  --height <N>     Window height (default: 720)\n"
         "  --title <str>    Window title\n"
+        "  --scene <name>   Scene to load: testbox, debug (default: debug)\n"
         "  --fullscreen     Run in fullscreen mode\n"
         "  --no-vsync       Disable vsync\n"
         "  --help, -h       Show this help message\n";
+}
+
+std::unique_ptr<GameScene> createScene(const std::string& name, const std::string& resourceDir) {
+    if (name == "testbox") {
+        return std::make_unique<TestBoxScene>(resourceDir);
+    } else if (name == "debug") {
+        return std::make_unique<DebugDemoScene>(resourceDir);
+    }
+    std::cerr << "Unknown scene '" << name << "', using debug scene\n";
+    return std::make_unique<DebugDemoScene>(resourceDir);
 }
 
 [[nodiscard]] bool parseIntArg(const char* value, int& out) noexcept {
@@ -36,6 +48,7 @@ int main(int argc, char* argv[]) {
     try {
         FlyTracer::AppConfig config;
         (void)config.loadFromFile("resources/config.cfg");
+        std::string sceneName = "debug";  // Default to debug demo scene
 
         for (int i = 1; i < argc; ++i) {
             const std::string_view arg = argv[i];
@@ -50,6 +63,8 @@ int main(int argc, char* argv[]) {
                 }
             } else if (arg == "--title" && i + 1 < argc) {
                 config.windowTitle = argv[++i];
+            } else if (arg == "--scene" && i + 1 < argc) {
+                sceneName = argv[++i];
             } else if (arg == "--fullscreen") {
                 config.fullscreen = true;
             } else if (arg == "--no-vsync") {
@@ -60,7 +75,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        auto scene = std::make_unique<TestBoxScene>(config.resourceDirectory);
+        auto scene = createScene(sceneName, config.resourceDirectory);
         Application app(config.windowWidth, config.windowHeight, config.windowTitle,
                         std::move(scene), config.shaderDirectory);
         app.run();

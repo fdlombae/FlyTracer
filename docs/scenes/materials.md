@@ -107,34 +107,34 @@ struct Material {
 ### Material Showcase
 
 ```cpp
-void MyScene::onInit(VulkanRenderer* renderer) {
-    addGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray(0.5f)));
+void MyScene::OnInit(VulkanRenderer* renderer) {
+    AddGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray(0.5f)));
 
     // Row 1: Shading modes
-    addSphere(TriVector(-6.0f, 1.5f, 0.0f), 1.5f,
+    AddSphere(TriVector(-6.0f, 1.5f, 0.0f), 1.5f,
               Scene::Material::Flat(Scene::Color::Red()));
-    addSphere(TriVector(-2.0f, 1.5f, 0.0f), 1.5f,
+    AddSphere(TriVector(-2.0f, 1.5f, 0.0f), 1.5f,
               Scene::Material::Lambert(Scene::Color::Red()));
-    addSphere(TriVector(2.0f, 1.5f, 0.0f), 1.5f,
+    AddSphere(TriVector(2.0f, 1.5f, 0.0f), 1.5f,
               Scene::Material::Phong(Scene::Color::Red(), 32.0f));
-    addSphere(TriVector(6.0f, 1.5f, 0.0f), 1.5f,
+    AddSphere(TriVector(6.0f, 1.5f, 0.0f), 1.5f,
               Scene::Material::PBR(Scene::Color::Red(), 0.0f, 0.3f));
 
     // Row 2: PBR roughness variation
     for (int i = 0; i < 5; ++i) {
         float roughness = i / 4.0f;  // 0.0 to 1.0
-        addSphere(TriVector(-4.0f + i * 2.0f, 1.5f, 4.0f), 1.0f,
+        AddSphere(TriVector(-4.0f + i * 2.0f, 1.5f, 4.0f), 1.0f,
                   Scene::Material::PBR(Scene::Color::White(), 0.0f, roughness));
     }
 
     // Row 3: PBR metalness variation
     for (int i = 0; i < 5; ++i) {
         float metalness = i / 4.0f;  // 0.0 to 1.0
-        addSphere(TriVector(-4.0f + i * 2.0f, 1.5f, 8.0f), 1.0f,
+        AddSphere(TriVector(-4.0f + i * 2.0f, 1.5f, 8.0f), 1.0f,
                   Scene::Material::PBR(Scene::Color(0.9f, 0.7f, 0.3f), metalness, 0.3f));
     }
 
-    addPointLight(TriVector(0.0f, 10.0f, 4.0f), Scene::Color::White(), 2.0f, 50.0f);
+    AddPointLight(TriVector(0.0f, 10.0f, 4.0f), Scene::Color::White(), 2.0f, 50.0f);
 }
 ```
 
@@ -163,12 +163,12 @@ auto glass = Scene::Material::Phong(Scene::Color(0.9f, 0.9f, 1.0f), 128.0f, 0.9f
 ### Changing Materials at Runtime
 
 ```cpp
-void MyScene::onUpdate(float deltaTime) {
+void MyScene::OnUpdate(float deltaTime) {
     m_time += deltaTime;
 
     // Animate roughness
     float roughness = (std::sin(m_time) + 1.0f) * 0.5f;  // 0 to 1
-    setSphereMaterial(m_sphereId,
+    SetSphereMaterial(m_sphereId,
                       Scene::Material::PBR(Scene::Color::Gold(), 1.0f, roughness));
 }
 ```

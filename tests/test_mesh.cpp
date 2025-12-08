@@ -10,10 +10,10 @@ protected:
 
 // Test default construction
 TEST_F(MeshTest, DefaultConstruction) {
-    EXPECT_TRUE(mesh.vertices().empty());
-    EXPECT_TRUE(mesh.triangles().empty());
-    EXPECT_EQ(mesh.vertexCount(), 0);
-    EXPECT_EQ(mesh.triangleCount(), 0);
+    EXPECT_TRUE(mesh.Vertices().empty());
+    EXPECT_TRUE(mesh.Triangles().empty());
+    EXPECT_EQ(mesh.VertexCount(), 0);
+    EXPECT_EQ(mesh.TriangleCount(), 0);
 }
 
 // Test adding vertices
@@ -26,12 +26,12 @@ TEST_F(MeshTest, AddVertex) {
     v.texCoord[0] = 0.5f;
     v.texCoord[1] = 0.5f;
 
-    mesh.addVertex(v);
+    mesh.AddVertex(v);
 
-    EXPECT_EQ(mesh.vertexCount(), 1);
-    EXPECT_FLOAT_EQ(mesh.vertices()[0].position.e032(), 1.0f);
-    EXPECT_FLOAT_EQ(mesh.vertices()[0].position.e013(), 2.0f);
-    EXPECT_FLOAT_EQ(mesh.vertices()[0].position.e021(), 3.0f);
+    EXPECT_EQ(mesh.VertexCount(), 1);
+    EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e032(), 1.0f);
+    EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e013(), 2.0f);
+    EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e021(), 3.0f);
 }
 
 // Test adding triangles
@@ -40,7 +40,7 @@ TEST_F(MeshTest, AddTriangle) {
     for (int i = 0; i < 3; ++i) {
         Vertex v;
         v.position = TriVector(static_cast<float>(i), 0.0f, 0.0f, 1.0f);
-        mesh.addVertex(v);
+        mesh.AddVertex(v);
     }
 
     Triangle tri;
@@ -49,28 +49,28 @@ TEST_F(MeshTest, AddTriangle) {
     tri.indices[2] = 2;
     tri.materialIndex = 0;
 
-    mesh.addTriangle(tri);
+    mesh.AddTriangle(tri);
 
-    EXPECT_EQ(mesh.triangleCount(), 1);
-    EXPECT_EQ(mesh.triangles()[0].indices[0], 0);
-    EXPECT_EQ(mesh.triangles()[0].indices[1], 1);
-    EXPECT_EQ(mesh.triangles()[0].indices[2], 2);
+    EXPECT_EQ(mesh.TriangleCount(), 1);
+    EXPECT_EQ(mesh.Triangles()[0].indices[0], 0);
+    EXPECT_EQ(mesh.Triangles()[0].indices[1], 1);
+    EXPECT_EQ(mesh.Triangles()[0].indices[2], 2);
 }
 
 // Test clear functionality
 TEST_F(MeshTest, Clear) {
     Vertex v;
-    mesh.addVertex(v);
+    mesh.AddVertex(v);
     Triangle tri;
     tri.indices[0] = 0;
     tri.indices[1] = 0;
     tri.indices[2] = 0;
-    mesh.addTriangle(tri);
+    mesh.AddTriangle(tri);
 
-    mesh.clear();
+    mesh.Clear();
 
-    EXPECT_TRUE(mesh.vertices().empty());
-    EXPECT_TRUE(mesh.triangles().empty());
+    EXPECT_TRUE(mesh.Vertices().empty());
+    EXPECT_TRUE(mesh.Triangles().empty());
 }
 
 // Test material management
@@ -82,53 +82,55 @@ TEST_F(MeshTest, AddMaterial) {
     mat.diffuse[2] = 0.0f;
     mat.shininess = 64.0f;
 
-    mesh.addMaterial(mat);
+    mesh.AddMaterial(mat);
 
-    EXPECT_EQ(mesh.materialCount(), 1);
-    EXPECT_EQ(mesh.getMaterial(0).name, "TestMaterial");
-    EXPECT_FLOAT_EQ(mesh.getMaterial(0).shininess, 64.0f);
+    EXPECT_EQ(mesh.MaterialCount(), 1);
+    EXPECT_EQ(mesh.GetMaterial(0).name, "TestMaterial");
+    EXPECT_FLOAT_EQ(mesh.GetMaterial(0).shininess, 64.0f);
 }
 
 // Test getting material out of bounds throws exception
 TEST_F(MeshTest, GetMaterialOutOfBoundsThrows) {
-    EXPECT_THROW((void)mesh.getMaterial(999), std::out_of_range);
+    EXPECT_THROW((void)mesh.GetMaterial(999), std::out_of_range);
 }
 
 // Test hasMaterial method
 TEST_F(MeshTest, HasMaterial) {
-    EXPECT_FALSE(mesh.hasMaterial(0));
+    EXPECT_FALSE(mesh.HasMaterial(0));
 
     Material mat;
     mat.name = "TestMaterial";
-    mesh.addMaterial(mat);
+    mesh.AddMaterial(mat);
 
-    EXPECT_TRUE(mesh.hasMaterial(0));
-    EXPECT_FALSE(mesh.hasMaterial(1));
+    EXPECT_TRUE(mesh.HasMaterial(0));
+    EXPECT_FALSE(mesh.HasMaterial(1));
 }
 
 // Test compute normals
 TEST_F(MeshTest, ComputeNormals) {
     // Create a simple triangle in the XY plane (normal should be +Z)
+    // Note: ComputeNormals() negates the cross product for OBJ file convention
+    // (clockwise winding when viewed from outside). So we use CW winding here.
     Vertex v0, v1, v2;
     v0.position = TriVector(0.0f, 0.0f, 0.0f, 1.0f);
-    v1.position = TriVector(1.0f, 0.0f, 0.0f, 1.0f);
-    v2.position = TriVector(0.0f, 1.0f, 0.0f, 1.0f);
+    v1.position = TriVector(0.0f, 1.0f, 0.0f, 1.0f);  // Swapped with v2
+    v2.position = TriVector(1.0f, 0.0f, 0.0f, 1.0f);  // Swapped with v1
 
-    mesh.addVertex(v0);
-    mesh.addVertex(v1);
-    mesh.addVertex(v2);
+    mesh.AddVertex(v0);
+    mesh.AddVertex(v1);
+    mesh.AddVertex(v2);
 
     Triangle tri;
     tri.indices[0] = 0;
     tri.indices[1] = 1;
     tri.indices[2] = 2;
-    mesh.addTriangle(tri);
+    mesh.AddTriangle(tri);
 
-    mesh.computeNormals();
+    mesh.ComputeNormals();
 
     // All vertices should have normal pointing in +Z direction
     // Normal uses Vector: e0=d, e1=nx, e2=ny, e3=nz
-    for (const auto& v : mesh.vertices()) {
+    for (const auto& v : mesh.Vertices()) {
         EXPECT_NEAR(v.normal.e1(), 0.0f, 0.001f);  // nx
         EXPECT_NEAR(v.normal.e2(), 0.0f, 0.001f);  // ny
         EXPECT_NEAR(v.normal.e3(), 1.0f, 0.001f);  // nz
@@ -142,10 +144,10 @@ TEST_F(MeshTest, SetVerticesMove) {
         vertices[i].position = TriVector(static_cast<float>(i), 0.0f, 0.0f, 1.0f);
     }
 
-    mesh.setVertices(std::move(vertices));
+    mesh.SetVertices(std::move(vertices));
 
-    EXPECT_EQ(mesh.vertexCount(), 10);
-    EXPECT_FLOAT_EQ(mesh.vertices()[5].position.e032(), 5.0f);
+    EXPECT_EQ(mesh.VertexCount(), 10);
+    EXPECT_FLOAT_EQ(mesh.Vertices()[5].position.e032(), 5.0f);
 }
 
 // Test setTriangles with move semantics
@@ -155,10 +157,10 @@ TEST_F(MeshTest, SetTrianglesMove) {
         triangles[i].materialIndex = static_cast<uint32_t>(i);
     }
 
-    mesh.setTriangles(std::move(triangles));
+    mesh.SetTriangles(std::move(triangles));
 
-    EXPECT_EQ(mesh.triangleCount(), 5);
-    EXPECT_EQ(mesh.triangles()[3].materialIndex, 3);
+    EXPECT_EQ(mesh.TriangleCount(), 5);
+    EXPECT_EQ(mesh.Triangles()[3].materialIndex, 3);
 }
 
 // Test Material default values

@@ -6,56 +6,53 @@
 TestBoxScene::TestBoxScene(const std::string& resourceDir)
     : GameScene(resourceDir) {}
 
-void TestBoxScene::onInit([[maybe_unused]] VulkanRenderer* renderer) {
+void TestBoxScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
     constexpr float halfWidth = 50.0f;
     constexpr float height = 30.0f;
-    constexpr float halfDepth = 20.0f;
 
     // Bottom plane
-    addPlane(Vector(0.0f, 0.0f, 1.0f, 0.0f),
+    AddPlane(Vector(0.0f, 0.0f, 1.0f, 0.0f),
              Scene::Material::Lambert(Scene::Color(0.6f, 0.6f, 0.6f)));
 
     // Top plane
-    addPlane(Vector(height, 0.0f, -1.0f, 0.0f),
+    AddPlane(Vector(height, 0.0f, -1.0f, 0.0f),
              Scene::Material::Lambert(Scene::Color(0.8f, 0.8f, 0.9f)));
 
     // Left plane
-    addPlane(Vector(halfWidth, 1.0f, 0.0f, 0.0f),
+    AddPlane(Vector(halfWidth, 1.0f, 0.0f, 0.0f),
              Scene::Material::Lambert(Scene::Color(0.9f, 0.5f, 0.5f)));
 
     // Right plane
-    addPlane(Vector(halfWidth, -1.0f, 0.0f, 0.0f),
+    AddPlane(Vector(halfWidth, -1.0f, 0.0f, 0.0f),
              Scene::Material::Lambert(Scene::Color(0.5f, 0.9f, 0.5f)));
 
     // Spheres
-    m_sphere1Id = addSphere(TriVector(m_sphere1Radius, m_sphere1Height, 0.0f), 5.0f,
+    m_sphere1Id = AddSphere(TriVector(m_sphere1Radius, m_sphere1Height, 0.0f), 5.0f,
               Scene::Material::Metal(Scene::Color(0.9f, 0.3f, 0.3f), 0.2f));
 
-    m_sphere2Id = addSphere(TriVector(-m_sphere2Radius, m_sphere2Height, 0.0f), 8.0f,
+    m_sphere2Id = AddSphere(TriVector(-m_sphere2Radius, m_sphere2Height, 0.0f), 8.0f,
               Scene::Material::Glossy(Scene::Color(0.3f, 0.3f, 0.9f), 0.1f));
 
     // Pheasant mesh
-    m_pheasantMeshId = loadMesh("pheasant.obj", "pheasant.png");
-    addMeshInstance(m_pheasantMeshId, TriVector(0.0f, m_pheasantHeight, 0.0f), "pheasant");
+    m_pheasantMeshId = LoadMesh("pheasant.obj", "pheasant.png");
+    AddMeshInstance(m_pheasantMeshId, TriVector(0.0f, m_pheasantHeight, 0.0f), "pheasant");
 
-    if (auto* pheasant = findInstance("pheasant")) {
+    if (auto* pheasant = FindInstance("pheasant")) {
         pheasant->scale = m_pheasantScale;
     }
 
     // Point light
-    addPointLight(TriVector(0.0f, 20.0f, 0.0f),
+    AddPointLight(TriVector(0.0f, 20.0f, 0.0f),
                   Scene::Color(1.0f, 1.0f, 1.0f), 2.0f, 100.0f);
 
     // Camera
     m_cameraEye = TriVector(0.0f, 15.0f, 60.0f);
     m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f, 0.0f);
-
-    (void)halfDepth;  // Suppress unused variable warning
 }
 
-void TestBoxScene::onUpdate(float deltaTime) {
-    updateFPS(deltaTime);
+void TestBoxScene::OnUpdate(float deltaTime) {
+    UpdateFPS(deltaTime);
 
     // Rotate spheres
     const float incrementAngle = m_rotationSpeed * deltaTime;
@@ -63,24 +60,24 @@ void TestBoxScene::onUpdate(float deltaTime) {
     const BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
     const Motor R = Motor::Rotation(incrementDegrees, yAxis);
 
-    if (auto* sphere1 = getSphere(m_sphere1Id)) {
-        sphere1->setCenter((R * sphere1->getCenter() * ~R).Grade3());
+    if (auto* sphere1 = GetSphere(m_sphere1Id)) {
+        sphere1->SetCenter((R * sphere1->GetCenter() * ~R).Grade3());
     }
-    if (auto* sphere2 = getSphere(m_sphere2Id)) {
-        sphere2->setCenter((R * sphere2->getCenter() * ~R).Grade3());
+    if (auto* sphere2 = GetSphere(m_sphere2Id)) {
+        sphere2->SetCenter((R * sphere2->GetCenter() * ~R).Grade3());
     }
 
     // Update pheasant
     m_pheasantTime += m_pheasantSpeed * deltaTime;
 
-    if (auto* pheasant = findInstance("pheasant")) {
+    if (auto* pheasant = FindInstance("pheasant")) {
         const float pheasantX = std::sin(m_pheasantTime) / 10.0f;
         const Motor translation(1.0f, pheasantX * 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
         pheasant->transform = R * translation * pheasant->transform;
     }
 }
 
-void TestBoxScene::onInput(const InputState& input) {
+void TestBoxScene::OnInput(const InputState& input) {
     if (input.rightMouseDown) {
         m_cameraYaw += input.mouseDeltaX * m_mouseSensitivity;
         m_cameraPitch += input.mouseDeltaY * m_mouseSensitivity;
@@ -101,9 +98,9 @@ void TestBoxScene::onInput(const InputState& input) {
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
 
-void TestBoxScene::onGui() {
+void TestBoxScene::OnGui() {
     ImGui::Begin("Test Box Scene");
-    ImGui::Text("FPS: %.1f", getFPS());
+    ImGui::Text("FPS: %.1f", GetFPS());
     ImGui::Separator();
     ImGui::Text("Box: 100 x 30 x 40");
     ImGui::Text("4 Planes (bottom, top, left, right)");
@@ -125,4 +122,4 @@ void TestBoxScene::onGui() {
     ImGui::End();
 }
 
-void TestBoxScene::onShutdown() {}
+void TestBoxScene::OnShutdown() {}

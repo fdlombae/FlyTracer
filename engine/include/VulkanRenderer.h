@@ -29,37 +29,36 @@ public:
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
 
     // Rendering
-    void beginFrame();
-    void renderScene(const Scene::SceneData& sceneData,
+    void BeginFrame();
+    void RenderScene(const Scene::SceneData& sceneData,
                      const std::vector<std::unique_ptr<Mesh>>& meshes,
                      const std::vector<MeshInstance>& instances,
                      const float cameraRotation[9],  // 3x3 rotation matrix (row-major)
                      const float cameraPosition[3],
                      float time, float cameraFov);
-    void endFrame();
+    void EndFrame();
 
     // Resource management - Multi-mesh support
-    void uploadMeshes(const std::vector<std::unique_ptr<Mesh>>& meshes);
-    void uploadSceneData(const Scene::SceneData& sceneData);
-    void uploadInstances(const std::vector<MeshInstance>& instances);  // Upload mesh instance transforms
-    void updateSpheres(const std::vector<Scene::GPUSphere>& spheres);  // Update sphere buffer for animation
-    void updatePlanes(const std::vector<Scene::GPUPlane>& planes);    // Update plane buffer for animation
-    void uploadTexture(const std::string& filename);
-    void waitIdle();
+    void UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& meshes);
+    void UploadSceneData(const Scene::SceneData& sceneData);
+    void UploadInstances(const std::vector<MeshInstance>& instances);  // Upload mesh instance transforms
+    void UpdateSpheres(const std::vector<Scene::GPUSphere>& spheres);  // Update sphere buffer for animation
+    void UpdatePlanes(const std::vector<Scene::GPUPlane>& planes);    // Update plane buffer for animation
+    void UploadTexture(const std::string& filename);
+    void WaitIdle();
 
     // Post-upload finalization - call after all uploads are complete
-    void createDescriptorSet();  // Create and bind descriptor set after uploads
-    void createComputePipeline();  // Create compute pipeline after descriptor set
+    void CreateDescriptorSet();  // Create and bind descriptor set after uploads
+    void CreateComputePipeline();  // Create compute pipeline after descriptor set
 
-    // Memory optimization - notify when CPU data can be freed
-    bool areMeshesUploaded() const { return m_meshesUploaded; }
-    void notifyMeshesCPUDataFreed();  // Call after freeMeshCPUData()
+    // Memory optimization
+    bool AreMeshesUploaded() const { return m_meshesUploaded; }
 
     // Getters
-    VkDevice device() const { return m_device; }
-    VkPhysicalDevice physicalDevice() const { return m_physicalDevice; }
-    VkCommandPool commandPool() const { return m_commandPool; }
-    VkQueue computeQueue() const { return m_computeQueue; }
+    VkDevice Device() const { return m_device; }
+    VkPhysicalDevice PhysicalDevice() const { return m_physicalDevice; }
+    VkCommandPool CommandPool() const { return m_commandPool; }
+    VkQueue ComputeQueue() const { return m_computeQueue; }
 
 private:
     // Push constants structure for compute shader

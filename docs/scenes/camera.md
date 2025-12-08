@@ -13,10 +13,10 @@ FlyTracer uses a simple **eye-target-up** camera model with PGA TriVectors for p
 
 ## Setting the Camera
 
-### In onInit
+### In OnInit
 
 ```cpp
-void MyScene::onInit(VulkanRenderer* renderer) {
+void MyScene::OnInit(VulkanRenderer* renderer) {
     // Position camera
     m_cameraEye = TriVector(0.0f, 5.0f, 15.0f);     // Behind and above
     m_cameraTarget = TriVector(0.0f, 2.0f, 0.0f);   // Look at center
@@ -27,14 +27,14 @@ void MyScene::onInit(VulkanRenderer* renderer) {
 }
 ```
 
-### Using setCamera
+### Using SetCamera
 
 ```cpp
-setCamera(
+SetCamera(
     TriVector(eyeX, eyeY, eyeZ),
     TriVector(targetX, targetY, targetZ),
     TriVector(upX, upY, upZ)
 );
 
-setCameraFov(75.0f);
+SetCameraFov(75.0f);
 ```

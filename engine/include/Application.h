@@ -94,6 +94,25 @@ private:
     bool m_keyQ{false}, m_keyE{false};  // Up/down movement
     bool m_keyUp{false}, m_keyDown{false}, m_keyLeft{false}, m_keyRight{false};  // Arrow keys
 
+    // Modifier keys
+    bool m_keySpace{false};
+    bool m_keyShift{false};
+    bool m_keyCtrl{false};
+    bool m_keyAlt{false};
+
+    // Number keys (for mode switching, object selection)
+    bool m_key1{false}, m_key2{false}, m_key3{false}, m_key4{false}, m_key5{false};
+    bool m_key6{false}, m_key7{false}, m_key8{false}, m_key9{false}, m_key0{false};
+
+    // Action keys
+    bool m_keyR{false};   // Reset
+    bool m_keyP{false};   // Pause
+    bool m_keyG{false};   // Toggle gravity
+    bool m_keyV{false};   // Toggle velocity visualization
+    bool m_keyF{false};   // Toggle fullscreen / freeze
+    bool m_keyT{false};   // Toggle something
+    bool m_keyEsc{false}; // Escape (handled differently, but tracked)
+
     // FPS tracking
     float m_fps{0.0f};
     float m_fpsAccumulator{0.0f};

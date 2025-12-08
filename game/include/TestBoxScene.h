@@ -8,11 +8,11 @@ class TestBoxScene final : public GameScene {
 public:
     explicit TestBoxScene(const std::string& resourceDir);
 
-    void onInit(VulkanRenderer* renderer) override;
-    void onUpdate(float deltaTime) override;
-    void onInput(const InputState& input) override;
-    void onGui() override;
-    void onShutdown() override;
+    void OnInit(VulkanRenderer* renderer) override;
+    void OnUpdate(float deltaTime) override;
+    void OnInput(const InputState& input) override;
+    void OnGui() override;
+    void OnShutdown() override;
 
 private:
     static constexpr float kPi = std::numbers::pi_v<float>;

@@ -24,6 +24,8 @@ This section covers everything you need to build raytraced scenes in FlyTracer.
 
 [**Debug UI** <br><span>Create ImGui debug interfaces</span>](imgui.md)
 
+[**Debug Visualization** <br><span>Draw debug lines, points, and axes</span>](debug.md)
+
 </div>
 
 ## Minimal Example
@@ -34,16 +36,16 @@ public:
     explicit MyScene(const std::string& resourceDir)
         : GameScene(resourceDir) {}
 
-    void onInit(VulkanRenderer* renderer) override {
+    void OnInit(VulkanRenderer* renderer) override {
         // Ground
-        addGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray()));
+        AddGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray()));
 
         // Sphere
-        addSphere(TriVector(0.0f, 2.0f, 0.0f), 2.0f,
+        AddSphere(TriVector(0.0f, 2.0f, 0.0f), 2.0f,
                   Scene::Material::Metal(Scene::Color::Red(), 0.3f));
 
         // Light
-        addPointLight(TriVector(5.0f, 10.0f, 5.0f),
+        AddPointLight(TriVector(5.0f, 10.0f, 5.0f),
                       Scene::Color::White(), 1.5f, 50.0f);
 
         // Camera

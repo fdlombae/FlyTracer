@@ -137,11 +137,11 @@ struct alignas(16) GPUSphere {
         return create(x, y, z, r, mat);
     }
 
-    [[nodiscard]] TriVector getCenter() const noexcept {
+    [[nodiscard]] TriVector GetCenter() const noexcept {
         return TriVector(center[0], center[1], center[2], 1.0f);
     }
 
-    void setCenter(const TriVector& pt) noexcept {
+    void SetCenter(const TriVector& pt) noexcept {
         const float w = pt.e123();
         if (std::abs(w) > 1e-6f) {
             center[0] = pt.e032() / w;
@@ -154,7 +154,7 @@ struct alignas(16) GPUSphere {
         }
     }
 
-    [[nodiscard]] Material getMaterial() const noexcept {
+    [[nodiscard]] Material GetMaterial() const noexcept {
         Material m;
         m.shadingMode = static_cast<ShadingMode>(shadingMode);
         m.color = Color(color[0], color[1], color[2]);
@@ -165,7 +165,7 @@ struct alignas(16) GPUSphere {
         return m;
     }
 
-    void setMaterial(const Material& mat) noexcept {
+    void SetMaterial(const Material& mat) noexcept {
         color[0] = mat.color.r;
         color[1] = mat.color.g;
         color[2] = mat.color.b;
@@ -218,18 +218,18 @@ struct alignas(16) GPUPlane {
         return create(0.0f, 1.0f, 0.0f, height, mat);
     }
 
-    [[nodiscard]] Vector getPlane() const noexcept {
+    [[nodiscard]] Vector GetPlane() const noexcept {
         return Vector(-distance, normal[0], normal[1], normal[2]);
     }
 
-    void setPlane(const Vector& v) noexcept {
+    void SetPlane(const Vector& v) noexcept {
         normal[0] = v.e1();
         normal[1] = v.e2();
         normal[2] = v.e3();
         distance = -v.e0();
     }
 
-    [[nodiscard]] Material getMaterial() const noexcept {
+    [[nodiscard]] Material GetMaterial() const noexcept {
         Material m;
         m.shadingMode = static_cast<ShadingMode>(shadingMode);
         m.color = Color(color[0], color[1], color[2]);
@@ -239,7 +239,7 @@ struct alignas(16) GPUPlane {
         return m;
     }
 
-    void setMaterial(const Material& mat) noexcept {
+    void SetMaterial(const Material& mat) noexcept {
         color[0] = mat.color.r;
         color[1] = mat.color.g;
         color[2] = mat.color.b;
@@ -386,7 +386,7 @@ struct SceneData {
     std::vector<GPULight> lights;
     std::vector<GPUMaterial> materials;
 
-    void clear() noexcept {
+    void Clear() noexcept {
         spheres.clear();
         planes.clear();
         lights.clear();

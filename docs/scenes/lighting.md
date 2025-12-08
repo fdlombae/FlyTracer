@@ -7,7 +7,7 @@ FlyTracer supports three light types: **point lights**, **directional lights**, 
 Emit light in all directions from a single point. Intensity falls off with distance.
 
 ```cpp
-uint32_t id = addPointLight(
+uint32_t id = AddPointLight(
     TriVector(x, y, z),     // Position
     Scene::Color::White(),  // Color
     1.5f,                   // Intensity
@@ -15,23 +15,23 @@ uint32_t id = addPointLight(
 );
 
 // Or using float coordinates
-uint32_t id = addPointLight(x, y, z, color, intensity, range);
+uint32_t id = AddPointLight(x, y, z, color, intensity, range);
 ```
 
 ### Example
 
 ```cpp
-void MyScene::onInit(VulkanRenderer* renderer) {
+void MyScene::OnInit(VulkanRenderer* renderer) {
     // Warm overhead light
-    addPointLight(TriVector(0.0f, 10.0f, 0.0f),
+    AddPointLight(TriVector(0.0f, 10.0f, 0.0f),
                   Scene::Color(1.0f, 0.95f, 0.8f), 2.0f, 100.0f);
 
     // Blue accent light
-    addPointLight(TriVector(-5.0f, 3.0f, 5.0f),
+    AddPointLight(TriVector(-5.0f, 3.0f, 5.0f),
                   Scene::Color(0.4f, 0.6f, 1.0f), 1.0f, 30.0f);
 
     // Red accent light
-    addPointLight(TriVector(5.0f, 3.0f, 5.0f),
+    AddPointLight(TriVector(5.0f, 3.0f, 5.0f),
                   Scene::Color(1.0f, 0.4f, 0.4f), 1.0f, 30.0f);
 }
 ```
@@ -41,26 +41,26 @@ void MyScene::onInit(VulkanRenderer* renderer) {
 Parallel light rays from an infinitely distant source (like the sun). No position, only direction.
 
 ```cpp
-uint32_t id = addDirectionalLight(
+uint32_t id = AddDirectionalLight(
     TriVector(dx, dy, dz),  // Direction (will be normalized)
     Scene::Color::White(),  // Color
     1.0f                    // Intensity
 );
 
 // Or using float coordinates
-uint32_t id = addDirectionalLight(dx, dy, dz, color, intensity);
+uint32_t id = AddDirectionalLight(dx, dy, dz, color, intensity);
 ```
 
 ### Example
 
 ```cpp
-void MyScene::onInit(VulkanRenderer* renderer) {
+void MyScene::OnInit(VulkanRenderer* renderer) {
     // Sunlight from upper-right
-    addDirectionalLight(TriVector(-0.5f, -1.0f, -0.3f),
+    AddDirectionalLight(TriVector(-0.5f, -1.0f, -0.3f),
                         Scene::Color(1.0f, 0.98f, 0.9f), 1.2f);
 
     // Soft fill light from opposite direction
-    addDirectionalLight(TriVector(0.3f, -0.5f, 0.2f),
+    AddDirectionalLight(TriVector(0.3f, -0.5f, 0.2f),
                         Scene::Color(0.6f, 0.7f, 0.9f), 0.3f);
 }
 ```
@@ -70,7 +70,7 @@ void MyScene::onInit(VulkanRenderer* renderer) {
 Cone-shaped light from a point in a specific direction.
 
 ```cpp
-uint32_t id = addSpotLight(
+uint32_t id = AddSpotLight(
     TriVector(px, py, pz),  // Position
     TriVector(dx, dy, dz),  // Direction
     Scene::Color::White(),  // Color
@@ -80,15 +80,15 @@ uint32_t id = addSpotLight(
 );
 
 // Or using float coordinates
-uint32_t id = addSpotLight(px, py, pz, dx, dy, dz, color, intensity, angle, range);
+uint32_t id = AddSpotLight(px, py, pz, dx, dy, dz, color, intensity, angle, range);
 ```
 
 ### Example
 
 ```cpp
-void MyScene::onInit(VulkanRenderer* renderer) {
+void MyScene::OnInit(VulkanRenderer* renderer) {
     // Spotlight pointing down at the center
-    addSpotLight(
+    AddSpotLight(
         TriVector(0.0f, 15.0f, 0.0f),   // Above the scene
         TriVector(0.0f, -1.0f, 0.0f),   // Pointing down
         Scene::Color::White(),
@@ -102,7 +102,7 @@ void MyScene::onInit(VulkanRenderer* renderer) {
 ## Modifying Lights
 
 ```cpp
-Scene::GPULight* light = getLight(lightId);
+Scene::GPULight* light = GetLight(lightId);
 
 if (light) {
     // Change position (point/spot lights)
@@ -145,17 +145,17 @@ struct GPULight {
 ### Indoor Scene
 
 ```cpp
-void setupIndoorLighting() {
+void SetupIndoorLighting() {
     // Main ceiling light
-    addPointLight(TriVector(0.0f, 9.0f, 0.0f),
+    AddPointLight(TriVector(0.0f, 9.0f, 0.0f),
                   Scene::Color(1.0f, 0.95f, 0.85f), 2.0f, 20.0f);
 
     // Window light (directional, cooler)
-    addDirectionalLight(TriVector(1.0f, -0.5f, 0.0f),
+    AddDirectionalLight(TriVector(1.0f, -0.5f, 0.0f),
                         Scene::Color(0.8f, 0.9f, 1.0f), 0.8f);
 
     // Ambient fill (very soft)
-    addDirectionalLight(TriVector(0.0f, -1.0f, 0.0f),
+    AddDirectionalLight(TriVector(0.0f, -1.0f, 0.0f),
                         Scene::Color(0.5f, 0.5f, 0.6f), 0.2f);
 }
 ```
@@ -163,17 +163,17 @@ void setupIndoorLighting() {
 ### Outdoor Scene
 
 ```cpp
-void setupOutdoorLighting() {
+void SetupOutdoorLighting() {
     // Sun
-    addDirectionalLight(TriVector(-0.3f, -1.0f, -0.5f),
+    AddDirectionalLight(TriVector(-0.3f, -1.0f, -0.5f),
                         Scene::Color(1.0f, 0.98f, 0.92f), 1.5f);
 
     // Sky fill (soft blue from above)
-    addDirectionalLight(TriVector(0.0f, -1.0f, 0.0f),
+    AddDirectionalLight(TriVector(0.0f, -1.0f, 0.0f),
                         Scene::Color(0.6f, 0.75f, 1.0f), 0.4f);
 
     // Ground bounce (subtle warm from below)
-    addDirectionalLight(TriVector(0.0f, 1.0f, 0.0f),
+    AddDirectionalLight(TriVector(0.0f, 1.0f, 0.0f),
                         Scene::Color(0.4f, 0.35f, 0.3f), 0.15f);
 }
 ```
@@ -181,9 +181,9 @@ void setupOutdoorLighting() {
 ### Dramatic Spotlight
 
 ```cpp
-void setupDramaticLighting() {
+void SetupDramaticLighting() {
     // Single dramatic spotlight
-    addSpotLight(
+    AddSpotLight(
         TriVector(5.0f, 10.0f, 5.0f),
         TriVector(-0.4f, -0.8f, -0.4f),  // Angled down
         Scene::Color(1.0f, 0.9f, 0.8f),
@@ -193,7 +193,7 @@ void setupDramaticLighting() {
     );
 
     // Subtle fill to prevent pure black shadows
-    addDirectionalLight(TriVector(0.0f, -1.0f, 0.0f),
+    AddDirectionalLight(TriVector(0.0f, -1.0f, 0.0f),
                         Scene::Color(0.2f, 0.2f, 0.3f), 0.1f);
 }
 ```
@@ -205,15 +205,15 @@ class AnimatedLightScene : public GameScene {
     uint32_t m_lightId{0};
     float m_time{0.0f};
 
-    void onInit(VulkanRenderer* renderer) override {
-        m_lightId = addPointLight(TriVector(0.0f, 5.0f, 0.0f),
+    void OnInit(VulkanRenderer* renderer) override {
+        m_lightId = AddPointLight(TriVector(0.0f, 5.0f, 0.0f),
                                   Scene::Color::White(), 1.5f, 30.0f);
     }
 
-    void onUpdate(float deltaTime) override {
+    void OnUpdate(float deltaTime) override {
         m_time += deltaTime;
 
-        if (auto* light = getLight(m_lightId)) {
+        if (auto* light = GetLight(m_lightId)) {
             // Pulsing intensity
             light->intensity = 1.5f + std::sin(m_time * 3.0f) * 0.5f;
         }

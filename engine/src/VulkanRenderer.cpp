@@ -251,7 +251,7 @@ VulkanRenderer::~VulkanRenderer() noexcept {
     cleanup();
 }
 
-void VulkanRenderer::beginFrame() {
+void VulkanRenderer::BeginFrame() {
     // Wait for the previous frame using this slot to complete
     // Use a reasonable timeout (5 seconds) to detect GPU hangs instead of infinite wait
     constexpr uint64_t kFenceTimeoutNs = 5'000'000'000ULL;  // 5 seconds
@@ -304,7 +304,7 @@ void VulkanRenderer::beginFrame() {
     m_frameStarted = true;
 }
 
-void VulkanRenderer::renderScene(const Scene::SceneData& sceneData,
+void VulkanRenderer::RenderScene(const Scene::SceneData& sceneData,
                                   const std::vector<std::unique_ptr<Mesh>>& meshes,
                                   const std::vector<MeshInstance>& instances,
                                   const float cameraRotation[9],
@@ -316,7 +316,7 @@ void VulkanRenderer::renderScene(const Scene::SceneData& sceneData,
 
     // Update push constants
     m_pushConstants.time = time;
-    m_pushConstants.triangleCount = meshes.empty() || !meshes[0] ? 0 : static_cast<uint32_t>(meshes[0]->triangleCount());
+    m_pushConstants.triangleCount = meshes.empty() || !meshes[0] ? 0 : static_cast<uint32_t>(meshes[0]->TriangleCount());
     m_pushConstants.sphereCount = static_cast<uint32_t>(sceneData.spheres.size());
     m_pushConstants.planeCount = static_cast<uint32_t>(sceneData.planes.size());
     m_pushConstants.lightCount = static_cast<uint32_t>(sceneData.lights.size());
@@ -465,7 +465,7 @@ void VulkanRenderer::renderScene(const Scene::SceneData& sceneData,
     }
 }
 
-void VulkanRenderer::endFrame() {
+void VulkanRenderer::EndFrame() {
     if (!m_frameStarted) {
         return;
     }
@@ -571,7 +571,7 @@ void VulkanRenderer::endFrame() {
     m_frameStarted = false;
 }
 
-void VulkanRenderer::uploadMeshes(const std::vector<std::unique_ptr<Mesh>>& meshes) {
+void VulkanRenderer::UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& meshes) {
     // Clean up existing buffers before creating new ones to avoid memory leaks
     auto cleanupExistingBuffers = [this]() {
         if (m_vertexBuffer != VK_NULL_HANDLE) {
@@ -639,14 +639,14 @@ void VulkanRenderer::uploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
 
     // Use the first mesh as the primary mesh for rendering
     const auto& mesh = meshes[0];
-    const auto& vertices = mesh->vertices();
-    const auto& triangles = mesh->triangles();
+    const auto& vertices = mesh->Vertices();
+    const auto& triangles = mesh->Triangles();
 
     // Convert CPU vertices to GPU-compatible format
     std::vector<GPUVertex> gpuVertices;
     gpuVertices.reserve(vertices.size());
     for (const auto& v : vertices) {
-        gpuVertices.push_back(v.toGPU());
+        gpuVertices.push_back(v.ToGPU());
     }
 
     VkDeviceSize vertexBufferSize = sizeof(GPUVertex) * gpuVertices.size();
@@ -724,8 +724,8 @@ void VulkanRenderer::uploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
     vkFreeMemory(m_device, indexStagingMemory, nullptr);
 
     // Create BVH buffers
-    const auto& bvhNodes = mesh->bvhNodes();
-    const auto& bvhTriIndices = mesh->bvhTriIndices();
+    const auto& bvhNodes = mesh->BVHNodes();
+    const auto& bvhTriIndices = mesh->BVHTriIndices();
 
     if (!bvhNodes.empty()) {
         VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
@@ -737,11 +737,7 @@ void VulkanRenderer::uploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
     m_meshesUploaded = true;
 }
 
-void VulkanRenderer::notifyMeshesCPUDataFreed() {
-    // CPU mesh data has been freed - GPU buffers remain valid
-}
-
-void VulkanRenderer::uploadTexture(const std::string& filename) {
+void VulkanRenderer::UploadTexture(const std::string& filename) {
     int texWidth, texHeight, texChannels;
     stbi_uc* pixels = stbi_load(filename.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
@@ -773,7 +769,7 @@ void VulkanRenderer::uploadTexture(const std::string& filename) {
     }
 }
 
-void VulkanRenderer::uploadSceneData(const Scene::SceneData& sceneData) {
+void VulkanRenderer::UploadSceneData(const Scene::SceneData& sceneData) {
     // Create sphere buffer
     VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
                                    sceneData.spheres, m_sphereBuffer, m_sphereBufferMemory);
@@ -815,7 +811,7 @@ void VulkanRenderer::uploadSceneData(const Scene::SceneData& sceneData) {
                                    defaultInstances, m_instanceMotorBuffer, m_instanceMotorBufferMemory);
 }
 
-void VulkanRenderer::uploadInstances(const std::vector<MeshInstance>& instances) {
+void VulkanRenderer::UploadInstances(const std::vector<MeshInstance>& instances) {
     if (instances.empty()) {
         return;  // Keep default identity instance
     }
@@ -942,7 +938,7 @@ void VulkanRenderer::uploadInstances(const std::vector<MeshInstance>& instances)
 
 }
 
-void VulkanRenderer::updateSpheres(const std::vector<Scene::GPUSphere>& spheres) {
+void VulkanRenderer::UpdateSpheres(const std::vector<Scene::GPUSphere>& spheres) {
     if (spheres.empty() || m_sphereBuffer == VK_NULL_HANDLE) {
         return;
     }
@@ -950,7 +946,7 @@ void VulkanRenderer::updateSpheres(const std::vector<Scene::GPUSphere>& spheres)
                                     spheres, m_sphereBuffer);
 }
 
-void VulkanRenderer::updatePlanes(const std::vector<Scene::GPUPlane>& planes) {
+void VulkanRenderer::UpdatePlanes(const std::vector<Scene::GPUPlane>& planes) {
     if (planes.empty() || m_planeBuffer == VK_NULL_HANDLE) {
         return;
     }
@@ -958,7 +954,7 @@ void VulkanRenderer::updatePlanes(const std::vector<Scene::GPUPlane>& planes) {
                                     planes, m_planeBuffer);
 }
 
-void VulkanRenderer::waitIdle() {
+void VulkanRenderer::WaitIdle() {
     if (m_device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(m_device);
     }
@@ -1484,7 +1480,7 @@ void VulkanRenderer::createDescriptorPool() {
     std::cout << "Descriptor pool created\n";
 }
 
-void VulkanRenderer::createDescriptorSet() {
+void VulkanRenderer::CreateDescriptorSet() {
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = m_descriptorPool;
@@ -1657,7 +1653,7 @@ void VulkanRenderer::createDescriptorSet() {
     std::cout << "Descriptor set created\n";
 }
 
-void VulkanRenderer::createComputePipeline() {
+void VulkanRenderer::CreateComputePipeline() {
     const std::string shaderPath = m_config.shaderDir + "/raytracer.comp.spv";
     auto shaderCode = readFile(shaderPath);
     VkShaderModule shaderModule = createShaderModule(shaderCode);
@@ -1877,7 +1873,7 @@ void VulkanRenderer::recreateSwapchain() {
 }
 
 void VulkanRenderer::cleanup() {
-    waitIdle();
+    WaitIdle();
 
     // Shutdown ImGui BEFORE destroying any Vulkan resources it depends on
     ImGui_ImplVulkan_Shutdown();

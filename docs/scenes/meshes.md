@@ -8,10 +8,10 @@ Place your `.obj` and texture files in the `game/resources/` directory.
 
 ```cpp
 // Load mesh with texture
-uint32_t meshId = loadMesh("model.obj", "texture.png");
+uint32_t meshId = LoadMesh("model.obj", "texture.png");
 
 // Load mesh without texture
-uint32_t meshId = loadMesh("model.obj");
+uint32_t meshId = LoadMesh("model.obj");
 ```
 
 !!! note "Supported Formats"
@@ -24,11 +24,11 @@ A mesh can have multiple instances in the scene, each with its own transform.
 
 ```cpp
 // Place at position (using TriVector)
-uint32_t instanceId = addMeshInstance(meshId, TriVector(x, y, z), "optionalName");
+uint32_t instanceId = AddMeshInstance(meshId, TriVector(x, y, z), "optionalName");
 
 // Place with full Motor transform
 Motor transform = Motor::Translation(x, y, z) * Motor::Rotation(45.0f, BiVector::Y());
-uint32_t instanceId = addMeshInstance(meshId, transform, "rotatedObject");
+uint32_t instanceId = AddMeshInstance(meshId, transform, "rotatedObject");
 ```
 
 ## Modifying Instances
@@ -36,7 +36,7 @@ uint32_t instanceId = addMeshInstance(meshId, transform, "rotatedObject");
 ### By ID
 
 ```cpp
-MeshInstance* instance = getInstance(instanceId);
+MeshInstance* instance = GetInstance(instanceId);
 
 if (instance) {
     instance->scale = 2.0f;           // Uniform scale
@@ -48,7 +48,7 @@ if (instance) {
 ### By Name
 
 ```cpp
-MeshInstance* instance = findInstance("pheasant");
+MeshInstance* instance = FindInstance("pheasant");
 
 if (instance) {
     instance->scale = 0.5f;
@@ -59,13 +59,13 @@ if (instance) {
 
 ```cpp
 // Update transform
-setInstanceTransform(instanceId, newMotor);
+SetInstanceTransform(instanceId, newMotor);
 
 // Update position only (resets rotation)
-setInstancePosition(instanceId, TriVector(newX, newY, newZ));
+SetInstancePosition(instanceId, TriVector(newX, newY, newZ));
 
 // Toggle visibility
-setInstanceVisible(instanceId, false);
+SetInstanceVisible(instanceId, false);
 ```
 
 ## MeshInstance Structure
@@ -85,19 +85,19 @@ struct MeshInstance {
 Mesh CPU data can be freed after upload to GPU to save memory:
 
 ```cpp
-void MyScene::onInit(VulkanRenderer* renderer) {
-    m_meshId = loadMesh("large_model.obj", "texture.png");
-    addMeshInstance(m_meshId, TriVector(0.0f, 0.0f, 0.0f));
+void MyScene::OnInit(VulkanRenderer* renderer) {
+    m_meshId = LoadMesh("large_model.obj", "texture.png");
+    AddMeshInstance(m_meshId, TriVector(0.0f, 0.0f, 0.0f));
 
     // Free CPU-side vertex/triangle data (mesh is already on GPU)
-    freeMeshCPUData(m_meshId);
+    FreeMeshCPUData(m_meshId);
 
     // Or free all meshes at once
-    freeAllMeshCPUData();
+    FreeAllMeshCPUData();
 }
 
 // Check if data was freed
-bool freed = isMeshCPUDataFreed(m_meshId);
+bool freed = IsMeshCPUDataFreed(m_meshId);
 ```
 
 !!! warning
@@ -115,34 +115,34 @@ public:
     explicit ModelScene(const std::string& resourceDir)
         : GameScene(resourceDir) {}
 
-    void onInit(VulkanRenderer* renderer) override {
+    void OnInit(VulkanRenderer* renderer) override {
         // Load textured mesh
-        m_meshId = loadMesh("pheasant.obj", "pheasant.png");
+        m_meshId = LoadMesh("pheasant.obj", "pheasant.png");
 
         // Create instance with name
-        m_instanceId = addMeshInstance(m_meshId, TriVector(0.0f, 0.0f, 0.0f), "bird");
+        m_instanceId = AddMeshInstance(m_meshId, TriVector(0.0f, 0.0f, 0.0f), "bird");
 
         // Scale it down
-        if (auto* inst = findInstance("bird")) {
+        if (auto* inst = FindInstance("bird")) {
             inst->scale = 0.5f;
         }
 
         // Environment
-        addGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray()));
-        addPointLight(TriVector(5.0f, 10.0f, 5.0f), Scene::Color::White(), 2.0f, 50.0f);
+        AddGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray()));
+        AddPointLight(TriVector(5.0f, 10.0f, 5.0f), Scene::Color::White(), 2.0f, 50.0f);
 
         m_cameraEye = TriVector(0.0f, 3.0f, 8.0f);
         m_cameraTarget = TriVector(0.0f, 1.0f, 0.0f);
     }
 
-    void onUpdate(float deltaTime) override {
+    void OnUpdate(float deltaTime) override {
         m_rotation += deltaTime * 0.5f;
 
         // Rotate the model
         BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
         Motor rotation = Motor::Rotation(m_rotation * 57.3f, yAxis);  // rad to deg
 
-        setInstanceTransform(m_instanceId, rotation);
+        SetInstanceTransform(m_instanceId, rotation);
     }
 };
 ```
@@ -150,9 +150,9 @@ public:
 ## Example: Multiple Instances
 
 ```cpp
-void MyScene::onInit(VulkanRenderer* renderer) {
+void MyScene::OnInit(VulkanRenderer* renderer) {
     // Load mesh once
-    uint32_t treeId = loadMesh("tree.obj", "tree.png");
+    uint32_t treeId = LoadMesh("tree.obj", "tree.png");
 
     // Create a forest of instances
     for (int x = -5; x <= 5; x += 2) {
@@ -161,17 +161,17 @@ void MyScene::onInit(VulkanRenderer* renderer) {
             float offsetZ = (rand() % 100) / 100.0f - 0.5f;
             float scale = 0.8f + (rand() % 100) / 250.0f;
 
-            auto instanceId = addMeshInstance(treeId,
+            auto instanceId = AddMeshInstance(treeId,
                 TriVector(x + offsetX, 0.0f, z + offsetZ));
 
-            if (auto* inst = getInstance(instanceId)) {
+            if (auto* inst = GetInstance(instanceId)) {
                 inst->scale = scale;
             }
         }
     }
 
     // Free CPU data - all instances share the same GPU mesh
-    freeMeshCPUData(treeId);
+    FreeMeshCPUData(treeId);
 }
 ```
 

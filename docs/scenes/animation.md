@@ -4,10 +4,10 @@ FlyTracer uses the **Motor** type from PGA (Projective Geometric Algebra) for ob
 
 ## The Update Loop
 
-Animation happens in `onUpdate`, called every frame with delta time:
+Animation happens in `OnUpdate`, called every frame with delta time:
 
 ```cpp
-void MyScene::onUpdate(float deltaTime) {
+void MyScene::OnUpdate(float deltaTime) {
     m_time += deltaTime;  // Track total elapsed time
 
     // Animate objects here...
@@ -53,17 +53,17 @@ BiVector zAxis(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
 Spheres store their center as a TriVector. Use the sandwich product to transform:
 
 ```cpp
-void MyScene::onUpdate(float deltaTime) {
+void MyScene::OnUpdate(float deltaTime) {
     // Incremental rotation each frame
     float angleDegrees = m_rotationSpeed * deltaTime * 57.3f;  // rad/s to deg
     BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
     Motor R = Motor::Rotation(angleDegrees, yAxis);
 
-    if (auto* sphere = getSphere(m_sphereId)) {
+    if (auto* sphere = GetSphere(m_sphereId)) {
         // Transform center: R * center * ~R (sandwich product)
-        TriVector oldCenter = sphere->getCenter();
+        TriVector oldCenter = sphere->GetCenter();
         TriVector newCenter = (R * oldCenter * ~R).Grade3();
-        sphere->setCenter(newCenter);
+        sphere->SetCenter(newCenter);
     }
 }
 ```
@@ -73,12 +73,12 @@ void MyScene::onUpdate(float deltaTime) {
 Mesh instances have a `transform` Motor that can be modified directly:
 
 ```cpp
-void MyScene::onUpdate(float deltaTime) {
+void MyScene::OnUpdate(float deltaTime) {
     float angleDeg = 30.0f * deltaTime;  // 30 degrees per second
     BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
     Motor R = Motor::Rotation(angleDeg, yAxis);
 
-    if (auto* instance = findInstance("myMesh")) {
+    if (auto* instance = FindInstance("myMesh")) {
         // Compose with existing transform
         instance->transform = R * instance->transform;
     }
@@ -88,14 +88,14 @@ void MyScene::onUpdate(float deltaTime) {
 ### Translation Animation
 
 ```cpp
-void MyScene::onUpdate(float deltaTime) {
+void MyScene::OnUpdate(float deltaTime) {
     m_time += deltaTime;
 
     // Sine wave movement
     float x = std::sin(m_time) * 5.0f;
     Motor T = Motor::Translation(x, 0.0f, 0.0f);
 
-    if (auto* instance = findInstance("bouncer")) {
+    if (auto* instance = FindInstance("bouncer")) {
         instance->transform = T;
     }
 }
@@ -104,7 +104,7 @@ void MyScene::onUpdate(float deltaTime) {
 ### Combined Rotation + Translation
 
 ```cpp
-void MyScene::onUpdate(float deltaTime) {
+void MyScene::OnUpdate(float deltaTime) {
     m_time += deltaTime;
 
     // Rotation
@@ -115,7 +115,7 @@ void MyScene::onUpdate(float deltaTime) {
     float y = std::sin(m_time * 2.0f) * 0.5f;
     Motor T = Motor::Translation(0.0f, y, 0.0f);
 
-    if (auto* instance = findInstance("floating")) {
+    if (auto* instance = FindInstance("floating")) {
         // Rotate first, then bob up/down
         instance->transform = T * R;
     }

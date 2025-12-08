@@ -69,10 +69,10 @@ class MyScene : public GameScene {
 public:
     explicit MyScene(const std::string& resourceDir);
 
-    void onInit(VulkanRenderer* renderer) override;
-    void onUpdate(float deltaTime) override;
-    void onInput(const InputState& input) override;
-    void onGui() override;
+    void OnInit(VulkanRenderer* renderer) override;
+    void OnUpdate(float deltaTime) override;
+    void OnInput(const InputState& input) override;
+    void OnGui() override;
 };
 ```
 
@@ -86,27 +86,27 @@ public:
 MyScene::MyScene(const std::string& resourceDir)
     : GameScene(resourceDir) {}
 
-void MyScene::onInit(VulkanRenderer* renderer) {
+void MyScene::OnInit(VulkanRenderer* renderer) {
     // Add scene objects here
-    addGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray()));
-    addSphere(TriVector(0.0f, 2.0f, 0.0f), 2.0f,
+    AddGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray()));
+    AddSphere(TriVector(0.0f, 2.0f, 0.0f), 2.0f,
               Scene::Material::PBR(Scene::Color::Red()));
-    addPointLight(TriVector(5.0f, 10.0f, 5.0f),
+    AddPointLight(TriVector(5.0f, 10.0f, 5.0f),
                   Scene::Color::White(), 1.5f, 50.0f);
 
     m_cameraEye = TriVector(0.0f, 5.0f, 15.0f);
     m_cameraTarget = TriVector(0.0f, 2.0f, 0.0f);
 }
 
-void MyScene::onUpdate(float deltaTime) {
+void MyScene::OnUpdate(float deltaTime) {
     // Animation logic here
 }
 
-void MyScene::onInput(const InputState& input) {
+void MyScene::OnInput(const InputState& input) {
     // Input handling here
 }
 
-void MyScene::onGui() {
+void MyScene::OnGui() {
     ImGui::Begin("My Scene");
     ImGui::Text("Hello, FlyTracer!");
     ImGui::End();

@@ -11,17 +11,17 @@
 #include <stdexcept>
 #include <functional>
 
-bool Mesh::loadFromFile(const std::string& filename) {
+bool Mesh::LoadFromFile(const std::string& filename) {
     // Extract the directory for material file lookup
     std::filesystem::path filePath(filename);
     std::string mtlBasePath = filePath.parent_path().string();
     if (!mtlBasePath.empty()) {
         mtlBasePath += "/";
     }
-    return loadFromFile(filename, mtlBasePath);
+    return LoadFromFile(filename, mtlBasePath);
 }
 
-bool Mesh::loadFromFile(const std::string& objFilename, const std::string& mtlBasePath) {
+bool Mesh::LoadFromFile(const std::string& objFilename, const std::string& mtlBasePath) {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> objMaterials;
@@ -38,7 +38,7 @@ bool Mesh::loadFromFile(const std::string& objFilename, const std::string& mtlBa
     }
 
     // Clear existing data
-    clear();
+    Clear();
 
     // Convert tinyobj materials to our Material format
     for (const auto& mat : objMaterials) {
@@ -195,19 +195,19 @@ bool Mesh::loadFromFile(const std::string& objFilename, const std::string& mtlBa
         }
     }
     if (needsNormals) {
-        computeNormals();
+        ComputeNormals();
     }
 
     return !m_vertices.empty();
 }
 
-void Mesh::clear() {
+void Mesh::Clear() {
     m_vertices.clear();
     m_triangles.clear();
     m_materials.clear();
 }
 
-void Mesh::clearCPUData() {
+void Mesh::ClearCPUData() {
     // Free CPU memory but keep BVH, metadata, and physics data
     // This is called after GPU upload to save memory
     m_vertices.clear();
@@ -218,11 +218,11 @@ void Mesh::clearCPUData() {
     // Keep physics data (bounding box, face normals) for collision detection
 }
 
-void Mesh::addMaterial(const Material& material) {
+void Mesh::AddMaterial(const Material& material) {
     m_materials.push_back(material);
 }
 
-const Material& Mesh::getMaterial(size_t index) const {
+const Material& Mesh::GetMaterial(size_t index) const {
     if (index >= m_materials.size()) {
         throw std::out_of_range("Material index " + std::to_string(index) +
                                 " out of range (size: " + std::to_string(m_materials.size()) + ")");
@@ -230,7 +230,7 @@ const Material& Mesh::getMaterial(size_t index) const {
     return m_materials[index];
 }
 
-Material& Mesh::getMaterial(size_t index) {
+Material& Mesh::GetMaterial(size_t index) {
     if (index >= m_materials.size()) {
         throw std::out_of_range("Material index " + std::to_string(index) +
                                 " out of range (size: " + std::to_string(m_materials.size()) + ")");
@@ -238,23 +238,23 @@ Material& Mesh::getMaterial(size_t index) {
     return m_materials[index];
 }
 
-void Mesh::addVertex(const Vertex& vertex) {
+void Mesh::AddVertex(const Vertex& vertex) {
     m_vertices.push_back(vertex);
 }
 
-void Mesh::addTriangle(const Triangle& triangle) {
+void Mesh::AddTriangle(const Triangle& triangle) {
     m_triangles.push_back(triangle);
 }
 
-void Mesh::setVertices(std::vector<Vertex>&& vertices) {
+void Mesh::SetVertices(std::vector<Vertex>&& vertices) {
     m_vertices = std::move(vertices);
 }
 
-void Mesh::setTriangles(std::vector<Triangle>&& triangles) {
+void Mesh::SetTriangles(std::vector<Triangle>&& triangles) {
     m_triangles = std::move(triangles);
 }
 
-void Mesh::computeNormals() {
+void Mesh::ComputeNormals() {
     // Reset all normals to zero (Vector: e0=0, e1=nx, e2=ny, e3=nz)
     for (auto& v : m_vertices) {
         v.normal = Vector(0.0f, 0.0f, 0.0f, 0.0f);
@@ -351,7 +351,7 @@ void Mesh::computeNormals() {
     }
 }
 
-void Mesh::scale(float factor) {
+void Mesh::Scale(float factor) {
     for (auto& v : m_vertices) {
         // Scale position (TriVector: e032=x, e013=y, e021=z)
         v.position.e032() *= factor;
@@ -360,7 +360,7 @@ void Mesh::scale(float factor) {
     }
 }
 
-void Mesh::translate(float x, float y, float z) {
+void Mesh::Translate(float x, float y, float z) {
     for (auto& v : m_vertices) {
         // Translate position (TriVector: e032=x, e013=y, e021=z)
         v.position.e032() += x;
@@ -369,7 +369,7 @@ void Mesh::translate(float x, float y, float z) {
     }
 }
 
-void Mesh::centerOnOrigin() {
+void Mesh::CenterOnOrigin() {
     if (m_vertices.empty()) return;
 
     // Find bounding box using TriVector components
@@ -392,10 +392,10 @@ void Mesh::centerOnOrigin() {
     float centerZ = (minZ + maxZ) / 2.0f;
 
     // Translate to center
-    translate(-centerX, -centerY, -centerZ);
+    Translate(-centerX, -centerY, -centerZ);
 }
 
-void Mesh::decimate(float targetRatio) {
+void Mesh::Decimate(float targetRatio) {
     if (m_triangles.empty() || targetRatio >= 1.0f) return;
 
     targetRatio = std::max(0.01f, std::min(1.0f, targetRatio));
@@ -625,13 +625,13 @@ void Mesh::decimate(float targetRatio) {
     m_triangles = std::move(newTriangles);
 
     // Recompute normals for smooth shading
-    computeNormals();
+    ComputeNormals();
 
     std::cout << "Decimation complete: " << m_vertices.size() << " vertices, "
               << m_triangles.size() << " triangles" << std::endl;
 }
 
-void Mesh::computePhysicsData() {
+void Mesh::ComputePhysicsData() {
     if (m_vertices.empty() || m_triangles.empty()) {
         m_hasPhysicsData = false;
         return;
@@ -712,7 +712,7 @@ void Mesh::computePhysicsData() {
 
 // BVH Implementation using Surface Area Heuristic (SAH)
 
-void Mesh::buildBVH() {
+void Mesh::BuildBVH() {
     if (m_triangles.empty()) return;
 
     const size_t triCount = m_triangles.size();

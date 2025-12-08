@@ -4,12 +4,12 @@ FlyTracer integrates [Dear ImGui](https://github.com/ocornut/imgui) for debug in
 
 ## Basic Usage
 
-Override `onGui` to create your debug UI:
+Override `OnGui` to create your debug UI:
 
 ```cpp
 #include <imgui.h>
 
-void MyScene::onGui() {
+void MyScene::OnGui() {
     ImGui::Begin("My Debug Window");
     ImGui::Text("Hello, FlyTracer!");
     ImGui::End();
@@ -21,7 +21,7 @@ void MyScene::onGui() {
 ### Text Display
 
 ```cpp
-void MyScene::onGui() {
+void MyScene::OnGui() {
     ImGui::Begin("Stats");
 
     // Simple text
@@ -35,7 +35,7 @@ void MyScene::onGui() {
                 m_cameraEye.e032(), m_cameraEye.e013(), m_cameraEye.e021());
 
     // Built-in FPS helper
-    ImGui::Text("FPS: %.1f", getFPS());
+    ImGui::Text("FPS: %.1f", GetFPS());
 
     ImGui::End();
 }
@@ -44,7 +44,7 @@ void MyScene::onGui() {
 ### Sliders and Inputs
 
 ```cpp
-void MyScene::onGui() {
+void MyScene::OnGui() {
     ImGui::Begin("Parameters");
 
     // Float slider
@@ -72,18 +72,18 @@ void MyScene::onGui() {
 ### Buttons and Checkboxes
 
 ```cpp
-void MyScene::onGui() {
+void MyScene::OnGui() {
     ImGui::Begin("Controls");
 
     // Button
     if (ImGui::Button("Reset Scene")) {
-        resetScene();
+        ResetScene();
     }
 
     // Same line buttons
     ImGui::SameLine();
     if (ImGui::Button("Randomize")) {
-        randomize();
+        Randomize();
     }
 
     // Checkbox
@@ -104,7 +104,7 @@ void MyScene::onGui() {
 ### Combo Box (Dropdown)
 
 ```cpp
-void MyScene::onGui() {
+void MyScene::OnGui() {
     ImGui::Begin("Options");
 
     const char* items[] = { "Flat", "Lambert", "Phong", "PBR" };
@@ -117,7 +117,7 @@ void MyScene::onGui() {
 ### Separators and Headers
 
 ```cpp
-void MyScene::onGui() {
+void MyScene::OnGui() {
     ImGui::Begin("Organized Window");
 
     // Collapsible header

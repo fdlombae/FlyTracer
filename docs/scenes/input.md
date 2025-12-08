@@ -31,7 +31,7 @@ struct InputState {
 ## Basic Input Handling
 
 ```cpp
-void MyScene::onInput(const InputState& input) {
+void MyScene::OnInput(const InputState& input) {
     // Check mouse buttons
     if (input.leftMouseDown) {
         // Left mouse is held

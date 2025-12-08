@@ -140,6 +140,7 @@ set_target_properties(FlyTracerEngine PROPERTIES
 add_executable(${PROJECT_NAME}
     game/src/main.cpp
     game/src/TestBoxScene.cpp
+    game/src/DebugDemoScene.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

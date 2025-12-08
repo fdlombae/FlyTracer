@@ -11,11 +11,11 @@ public:
     RaytracerScene(const std::string& resourceDir)
         : GameScene(resourceDir) {}
 
-    void onInit(VulkanRenderer* renderer) override {}
-    void onUpdate(float deltaTime) override {}
-    void onInput(const InputState& input) override {}
-    void onGui() override {}
-    void onShutdown() override {}
+    void OnInit(VulkanRenderer* renderer) override {}
+    void OnUpdate(float deltaTime) override {}
+    void OnInput(const InputState& input) override {}
+    void OnGui() override {}
+    void OnShutdown() override {}
 };
 
 struct Raytracer::Impl {
@@ -63,14 +63,14 @@ bool Raytracer::loadMesh(const std::string& objPath) {
     if (!m_impl->mesh) {
         m_impl->mesh = std::make_unique<Mesh>();
     }
-    return m_impl->mesh->loadFromFile(objPath);
+    return m_impl->mesh->LoadFromFile(objPath);
 }
 
 bool Raytracer::loadMesh(const std::string& objPath, const std::string& mtlBasePath) {
     if (!m_impl->mesh) {
         m_impl->mesh = std::make_unique<Mesh>();
     }
-    return m_impl->mesh->loadFromFile(objPath, mtlBasePath);
+    return m_impl->mesh->LoadFromFile(objPath, mtlBasePath);
 }
 
 void Raytracer::setCamera(const Camera& camera) {

@@ -35,34 +35,34 @@ Application::Application(int width, int height, const std::string& title,
     m_renderer = std::make_unique<VulkanRenderer>(m_window, rendererConfig);
 
     // Initialize scene (scene loads its own meshes)
-    m_gameScene->onInit(m_renderer.get());
+    m_gameScene->OnInit(m_renderer.get());
 
     // Get scene data and mesh instances from the scene
-    m_sceneData = m_gameScene->getSceneData();
-    m_meshInstances = m_gameScene->getMeshInstances();
+    m_sceneData = m_gameScene->GetSceneData();
+    m_meshInstances = m_gameScene->GetMeshInstances();
 
     // Update camera from scene
-    m_cameraEye = m_gameScene->getCameraEye();
-    m_cameraTarget = m_gameScene->getCameraTarget();
-    m_cameraUp = m_gameScene->getCameraUp();
+    m_cameraEye = m_gameScene->GetCameraEye();
+    m_cameraTarget = m_gameScene->GetCameraTarget();
+    m_cameraUp = m_gameScene->GetCameraUp();
 
     // Upload meshes, scene data, instances to GPU
-    uploadMeshes(m_gameScene->getMeshes());
-    m_renderer->uploadSceneData(m_sceneData);
-    m_renderer->uploadInstances(m_meshInstances);
+    uploadMeshes(m_gameScene->GetMeshes());
+    m_renderer->UploadSceneData(m_sceneData);
+    m_renderer->UploadInstances(m_meshInstances);
 
     // Upload texture from scene (if specified)
-    const std::string& texturePath = m_gameScene->getTextureFilename();
+    const std::string& texturePath = m_gameScene->GetTextureFilename();
     if (!texturePath.empty()) {
-        m_renderer->uploadTexture(texturePath);
+        m_renderer->UploadTexture(texturePath);
     } else {
         // Upload dummy texture
-        m_renderer->uploadTexture("");
+        m_renderer->UploadTexture("");
     }
 
     // Create descriptor set and compute pipeline
-    m_renderer->createDescriptorSet();
-    m_renderer->createComputePipeline();
+    m_renderer->CreateDescriptorSet();
+    m_renderer->CreateComputePipeline();
 }
 
 Application::~Application() noexcept {
@@ -82,7 +82,7 @@ void Application::setCamera(const TriVector& eye, const TriVector& target, const
 }
 
 void Application::uploadMeshes(const std::vector<std::unique_ptr<Mesh>>& meshes) {
-    m_renderer->uploadMeshes(meshes);
+    m_renderer->UploadMeshes(meshes);
 }
 
 void Application::initSDL() {
@@ -123,7 +123,7 @@ void Application::run() {
     }
 
     // Wait for GPU to finish before cleanup
-    m_renderer->waitIdle();
+    m_renderer->WaitIdle();
 }
 
 void Application::handleEvents() {
@@ -140,16 +140,22 @@ void Application::handleEvents() {
         } else if (event.type == SDL_EVENT_KEY_DOWN) {
             if (event.key.key == SDLK_ESCAPE) {
                 m_running = false;
+                m_keyEsc = true;
             }
             // Track key state for scene input
-            // Arrow keys always go to the game (ImGui doesn't need them)
-            // WASD/QE only when ImGui doesn't want keyboard (e.g., text input)
+            // Arrow keys and modifiers always go to the game
+            // WASD/QE and action keys only when ImGui doesn't want keyboard
             switch (event.key.key) {
                 // Arrow keys always processed for game control
                 case SDLK_UP: m_keyUp = true; break;
                 case SDLK_DOWN: m_keyDown = true; break;
                 case SDLK_LEFT: m_keyLeft = true; break;
                 case SDLK_RIGHT: m_keyRight = true; break;
+                // Modifier keys (always tracked)
+                case SDLK_SPACE: m_keySpace = true; break;
+                case SDLK_LSHIFT: case SDLK_RSHIFT: m_keyShift = true; break;
+                case SDLK_LCTRL: case SDLK_RCTRL: m_keyCtrl = true; break;
+                case SDLK_LALT: case SDLK_RALT: m_keyAlt = true; break;
                 // WASD/QE only when ImGui doesn't want keyboard
                 case SDLK_W: if (!imguiWantsKeyboard) m_keyW = true; break;
                 case SDLK_A: if (!imguiWantsKeyboard) m_keyA = true; break;
@@ -157,6 +163,24 @@ void Application::handleEvents() {
                 case SDLK_D: if (!imguiWantsKeyboard) m_keyD = true; break;
                 case SDLK_Q: if (!imguiWantsKeyboard) m_keyQ = true; break;
                 case SDLK_E: if (!imguiWantsKeyboard) m_keyE = true; break;
+                // Action keys only when ImGui doesn't want keyboard
+                case SDLK_R: if (!imguiWantsKeyboard) m_keyR = true; break;
+                case SDLK_P: if (!imguiWantsKeyboard) m_keyP = true; break;
+                case SDLK_G: if (!imguiWantsKeyboard) m_keyG = true; break;
+                case SDLK_V: if (!imguiWantsKeyboard) m_keyV = true; break;
+                case SDLK_F: if (!imguiWantsKeyboard) m_keyF = true; break;
+                case SDLK_T: if (!imguiWantsKeyboard) m_keyT = true; break;
+                // Number keys only when ImGui doesn't want keyboard
+                case SDLK_1: if (!imguiWantsKeyboard) m_key1 = true; break;
+                case SDLK_2: if (!imguiWantsKeyboard) m_key2 = true; break;
+                case SDLK_3: if (!imguiWantsKeyboard) m_key3 = true; break;
+                case SDLK_4: if (!imguiWantsKeyboard) m_key4 = true; break;
+                case SDLK_5: if (!imguiWantsKeyboard) m_key5 = true; break;
+                case SDLK_6: if (!imguiWantsKeyboard) m_key6 = true; break;
+                case SDLK_7: if (!imguiWantsKeyboard) m_key7 = true; break;
+                case SDLK_8: if (!imguiWantsKeyboard) m_key8 = true; break;
+                case SDLK_9: if (!imguiWantsKeyboard) m_key9 = true; break;
+                case SDLK_0: if (!imguiWantsKeyboard) m_key0 = true; break;
                 default: break;
             }
         } else if (event.type == SDL_EVENT_KEY_UP) {
@@ -171,6 +195,27 @@ void Application::handleEvents() {
                 case SDLK_DOWN: m_keyDown = false; break;
                 case SDLK_LEFT: m_keyLeft = false; break;
                 case SDLK_RIGHT: m_keyRight = false; break;
+                case SDLK_SPACE: m_keySpace = false; break;
+                case SDLK_LSHIFT: case SDLK_RSHIFT: m_keyShift = false; break;
+                case SDLK_LCTRL: case SDLK_RCTRL: m_keyCtrl = false; break;
+                case SDLK_LALT: case SDLK_RALT: m_keyAlt = false; break;
+                case SDLK_R: m_keyR = false; break;
+                case SDLK_P: m_keyP = false; break;
+                case SDLK_G: m_keyG = false; break;
+                case SDLK_V: m_keyV = false; break;
+                case SDLK_F: m_keyF = false; break;
+                case SDLK_T: m_keyT = false; break;
+                case SDLK_1: m_key1 = false; break;
+                case SDLK_2: m_key2 = false; break;
+                case SDLK_3: m_key3 = false; break;
+                case SDLK_4: m_key4 = false; break;
+                case SDLK_5: m_key5 = false; break;
+                case SDLK_6: m_key6 = false; break;
+                case SDLK_7: m_key7 = false; break;
+                case SDLK_8: m_key8 = false; break;
+                case SDLK_9: m_key9 = false; break;
+                case SDLK_0: m_key0 = false; break;
+                case SDLK_ESCAPE: m_keyEsc = false; break;
                 default: break;
             }
         } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && !imguiWantsMouse) {
@@ -200,14 +245,19 @@ void Application::handleEvents() {
         } else if (event.type == SDL_EVENT_WINDOW_SHOWN || event.type == SDL_EVENT_WINDOW_EXPOSED) {
             if (m_windowMinimized) {
                 m_windowMinimized = false;
-                m_renderer->waitIdle();
+                m_renderer->WaitIdle();
             }
         } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
-            m_renderer->waitIdle();
+            m_renderer->WaitIdle();
+            // Reset all key states when focus is lost
             m_keyW = m_keyA = m_keyS = m_keyD = m_keyQ = m_keyE = false;
             m_keyUp = m_keyDown = m_keyLeft = m_keyRight = false;
+            m_keySpace = m_keyShift = m_keyCtrl = m_keyAlt = false;
+            m_key1 = m_key2 = m_key3 = m_key4 = m_key5 = false;
+            m_key6 = m_key7 = m_key8 = m_key9 = m_key0 = false;
+            m_keyR = m_keyP = m_keyG = m_keyV = m_keyF = m_keyT = m_keyEsc = false;
         } else if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
-            m_renderer->waitIdle();
+            m_renderer->WaitIdle();
         }
     }
 }
@@ -224,6 +274,8 @@ void Application::processInput(float deltaTime) {
         input.mouseDeltaX = m_mouseDeltaX;
         input.mouseDeltaY = m_mouseDeltaY;
         input.scrollDelta = m_scrollDelta;
+
+        // Movement keys
         input.keyW = m_keyW;
         input.keyA = m_keyA;
         input.keyS = m_keyS;
@@ -234,8 +286,36 @@ void Application::processInput(float deltaTime) {
         input.keyDown = m_keyDown;
         input.keyLeft = m_keyLeft;
         input.keyRight = m_keyRight;
+
+        // Modifier keys
+        input.keySpace = m_keySpace;
+        input.keyShift = m_keyShift;
+        input.keyCtrl = m_keyCtrl;
+        input.keyAlt = m_keyAlt;
+
+        // Number keys
+        input.key1 = m_key1;
+        input.key2 = m_key2;
+        input.key3 = m_key3;
+        input.key4 = m_key4;
+        input.key5 = m_key5;
+        input.key6 = m_key6;
+        input.key7 = m_key7;
+        input.key8 = m_key8;
+        input.key9 = m_key9;
+        input.key0 = m_key0;
+
+        // Action keys
+        input.keyR = m_keyR;
+        input.keyP = m_keyP;
+        input.keyG = m_keyG;
+        input.keyV = m_keyV;
+        input.keyF = m_keyF;
+        input.keyT = m_keyT;
+        input.keyEsc = m_keyEsc;
+
         input.deltaTime = deltaTime;
-        m_gameScene->onInput(input);
+        m_gameScene->OnInput(input);
 
         // Reset accumulated input after passing to scene
         m_mouseDeltaX = 0.0f;
@@ -250,19 +330,20 @@ void Application::update(float deltaTime) {
 
     // Update game scene
     if (m_gameScene) {
-        m_gameScene->onUpdate(deltaTime);
+        m_gameScene->ClearDebugDraw();  // Clear debug lines from previous frame
+        m_gameScene->OnUpdate(deltaTime);
 
         // Get updated scene data
-        m_sceneData = m_gameScene->getSceneData();
-        m_meshInstances = m_gameScene->getMeshInstances();
+        m_sceneData = m_gameScene->GetSceneData();
+        m_meshInstances = m_gameScene->GetMeshInstances();
 
         // NOTE: Instance upload moved to render() after beginFrame() fence wait
         // to avoid updating the buffer while GPU is still reading it
 
         // Update camera from scene
-        m_cameraEye = m_gameScene->getCameraEye();
-        m_cameraTarget = m_gameScene->getCameraTarget();
-        m_cameraUp = m_gameScene->getCameraUp();
+        m_cameraEye = m_gameScene->GetCameraEye();
+        m_cameraTarget = m_gameScene->GetCameraTarget();
+        m_cameraUp = m_gameScene->GetCameraUp();
     }
 
     // FPS calculation
@@ -334,13 +415,13 @@ void Application::render() {
     float cameraPosition[3] = {eyeX, eyeY, eyeZ};
 
     // Begin frame (waits for previous frame's fence)
-    m_renderer->beginFrame();
+    m_renderer->BeginFrame();
 
     // Upload instances AFTER fence wait to avoid updating while GPU is reading
     // This ensures the previous frame has finished using the buffer
-    m_renderer->uploadInstances(m_meshInstances);
-    m_renderer->updateSpheres(m_sceneData.spheres);
-    m_renderer->updatePlanes(m_sceneData.planes);
+    m_renderer->UploadInstances(m_meshInstances);
+    m_renderer->UpdateSpheres(m_sceneData.spheres);
+    m_renderer->UpdatePlanes(m_sceneData.planes);
 
     // Build ImGui UI
     ImGui::Begin("Controls");
@@ -352,22 +433,23 @@ void Application::render() {
 
     // Call scene's custom ImGui
     if (m_gameScene) {
-        m_gameScene->onGui();
+        m_gameScene->SetCameraFov(m_cameraFov);
+        m_gameScene->OnGui();
     }
 
     // Render scene with camera rotation matrix and position
     // Use game scene's meshes (m_meshes is not populated - it's a legacy member)
-    m_renderer->renderScene(m_sceneData, m_gameScene->getMeshes(), m_meshInstances,
+    m_renderer->RenderScene(m_sceneData, m_gameScene->GetMeshes(), m_meshInstances,
                            m_cameraRotation.data(), cameraPosition, m_time, m_cameraFov);
 
     // End frame
-    m_renderer->endFrame();
+    m_renderer->EndFrame();
 }
 
 void Application::cleanup() {
     // Cleanup game scene
     if (m_gameScene) {
-        m_gameScene->onShutdown();
+        m_gameScene->OnShutdown();
         m_gameScene.reset();
     }
 

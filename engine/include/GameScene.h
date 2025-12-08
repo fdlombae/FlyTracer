@@ -9,8 +9,24 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
+#include <cmath>
 
 class VulkanRenderer;
+
+// ============================================================================
+// Debug drawing primitives
+// ============================================================================
+struct DebugLine {
+    float from[3];
+    float to[3];
+    float color[3];
+};
+
+struct DebugSphere {
+    float center[3];
+    float radius;
+    float color[3];
+};
 
 struct MeshInstance {
     uint32_t meshId;
@@ -20,8 +36,9 @@ struct MeshInstance {
     std::string name;
 };
 
-// Input state passed to onInput
+// Input state passed to OnInput
 struct InputState {
+    // Mouse state
     bool leftMouseDown{false};
     bool rightMouseDown{false};
     bool middleMouseDown{false};
@@ -31,9 +48,29 @@ struct InputState {
     float mouseDeltaY{0.0f};
     float scrollDelta{0.0f};
 
+    // Movement keys
     bool keyW{false}, keyA{false}, keyS{false}, keyD{false};
     bool keyQ{false}, keyE{false};
     bool keyUp{false}, keyDown{false}, keyLeft{false}, keyRight{false};
+
+    // Modifier keys
+    bool keySpace{false};
+    bool keyShift{false};
+    bool keyCtrl{false};
+    bool keyAlt{false};
+
+    // Number keys (for mode switching, object selection)
+    bool key1{false}, key2{false}, key3{false}, key4{false}, key5{false};
+    bool key6{false}, key7{false}, key8{false}, key9{false}, key0{false};
+
+    // Common action keys
+    bool keyR{false};  // Reset
+    bool keyP{false};  // Pause
+    bool keyG{false};  // Toggle gravity
+    bool keyV{false};  // Toggle velocity visualization
+    bool keyF{false};  // Toggle fullscreen / freeze
+    bool keyT{false};  // Toggle something
+    bool keyEsc{false}; // Escape
 
     float deltaTime{0.0f};
 };
@@ -48,84 +85,111 @@ public:
     GameScene(GameScene&&) = default;
     GameScene& operator=(GameScene&&) = default;
 
-    virtual void onInit(VulkanRenderer* renderer);
-    virtual void onUpdate(float deltaTime);
-    virtual void onInput(const InputState& input);
-    virtual void onGui();
-    virtual void onShutdown();
+    virtual void OnInit(VulkanRenderer* renderer);
+    virtual void OnUpdate(float deltaTime);
+    virtual void OnInput(const InputState& input);
+    virtual void OnGui();
+    virtual void OnShutdown();
 
-    [[nodiscard]] Scene::SceneData& getSceneData() noexcept { return m_sceneData; }
-    [[nodiscard]] const Scene::SceneData& getSceneData() const noexcept { return m_sceneData; }
+    [[nodiscard]] Scene::SceneData& GetSceneData() noexcept { return m_sceneData; }
+    [[nodiscard]] const Scene::SceneData& GetSceneData() const noexcept { return m_sceneData; }
 
-    [[nodiscard]] const std::vector<std::unique_ptr<Mesh>>& getMeshes() const noexcept { return m_meshes; }
-    [[nodiscard]] std::vector<std::unique_ptr<Mesh>>& getMeshes() noexcept { return m_meshes; }
-    [[nodiscard]] const std::vector<MeshInstance>& getMeshInstances() const noexcept { return m_meshInstances; }
-    [[nodiscard]] std::vector<MeshInstance>& getMeshInstances() noexcept { return m_meshInstances; }
+    [[nodiscard]] const std::vector<std::unique_ptr<Mesh>>& GetMeshes() const noexcept { return m_meshes; }
+    [[nodiscard]] std::vector<std::unique_ptr<Mesh>>& GetMeshes() noexcept { return m_meshes; }
+    [[nodiscard]] const std::vector<MeshInstance>& GetMeshInstances() const noexcept { return m_meshInstances; }
+    [[nodiscard]] std::vector<MeshInstance>& GetMeshInstances() noexcept { return m_meshInstances; }
 
-    [[nodiscard]] Mesh* getMesh(uint32_t id) noexcept {
+    [[nodiscard]] Mesh* GetMesh(uint32_t id) noexcept {
         return id < m_meshes.size() ? m_meshes[id].get() : nullptr;
     }
-    [[nodiscard]] const Mesh* getMesh(uint32_t id) const noexcept {
+    [[nodiscard]] const Mesh* GetMesh(uint32_t id) const noexcept {
         return id < m_meshes.size() ? m_meshes[id].get() : nullptr;
     }
 
-    [[nodiscard]] const TriVector& getCameraEye() const noexcept { return m_cameraEye; }
-    [[nodiscard]] const TriVector& getCameraTarget() const noexcept { return m_cameraTarget; }
-    [[nodiscard]] const TriVector& getCameraUp() const noexcept { return m_cameraUp; }
-    [[nodiscard]] float getCameraFov() const noexcept { return m_cameraFov; }
+    [[nodiscard]] const TriVector& GetCameraEye() const noexcept { return m_cameraEye; }
+    [[nodiscard]] const TriVector& GetCameraTarget() const noexcept { return m_cameraTarget; }
+    [[nodiscard]] const TriVector& GetCameraUp() const noexcept { return m_cameraUp; }
+    [[nodiscard]] float GetCameraFov() const noexcept { return m_cameraFov; }
 
-    void setCamera(const TriVector& eye, const TriVector& target, const TriVector& up) noexcept {
+    void SetCamera(const TriVector& eye, const TriVector& target, const TriVector& up) noexcept {
         m_cameraEye = eye;
         m_cameraTarget = target;
         m_cameraUp = up;
     }
 
-    void setCameraFov(float fov) noexcept { m_cameraFov = fov; }
+    void SetCameraFov(float fov) noexcept { m_cameraFov = fov; }
 
-    void getCameraMotor(float out[8]) const noexcept;
+    [[nodiscard]] float GetFPS() const noexcept { return m_fps; }
+    void UpdateFPS(float deltaTime) noexcept;
 
-    [[nodiscard]] float getFPS() const noexcept { return m_fps; }
-    void updateFPS(float deltaTime) noexcept;
+    [[nodiscard]] const std::string& GetResourceDir() const noexcept { return m_resourceDir; }
+    [[nodiscard]] const std::string& GetTextureFilename() const noexcept { return m_textureFilename; }
 
-    [[nodiscard]] const std::string& getResourceDir() const noexcept { return m_resourceDir; }
-    [[nodiscard]] const std::string& getTextureFilename() const noexcept { return m_textureFilename; }
+    // Debug drawing (public for Application to call automatically)
+    void ClearDebugDraw();
+    void RenderDebugDraw() const;
+    void SetDebugDrawEnabled(bool enabled) { m_debugDrawEnabled = enabled; }
+    [[nodiscard]] bool IsDebugDrawEnabled() const { return m_debugDrawEnabled; }
 
 protected:
-    uint32_t loadMesh(std::string_view objFilename, std::string_view textureFilename = {});
+    uint32_t LoadMesh(std::string_view objFilename, std::string_view textureFilename = {});
 
-    void freeMeshCPUData(uint32_t meshId);
-    void freeAllMeshCPUData();
-    [[nodiscard]] bool isMeshCPUDataFreed(uint32_t meshId) const noexcept;
+    void FreeMeshCPUData(uint32_t meshId);
+    void FreeAllMeshCPUData();
+    [[nodiscard]] bool IsMeshCPUDataFreed(uint32_t meshId) const noexcept;
 
-    uint32_t addMeshInstance(uint32_t meshId, const TriVector& position, std::string_view name = {});
-    uint32_t addMeshInstance(uint32_t meshId, const Motor& transform, std::string_view name = {});
+    uint32_t AddMeshInstance(uint32_t meshId, const TriVector& position, std::string_view name = {});
+    uint32_t AddMeshInstance(uint32_t meshId, const Motor& transform, std::string_view name = {});
 
-    [[nodiscard]] MeshInstance* getInstance(uint32_t instanceId) noexcept;
-    [[nodiscard]] MeshInstance* findInstance(std::string_view name) noexcept;
-    void setInstanceTransform(uint32_t instanceId, const Motor& transform);
-    void setInstancePosition(uint32_t instanceId, const TriVector& position);
-    void setInstanceVisible(uint32_t instanceId, bool visible);
+    [[nodiscard]] MeshInstance* GetInstance(uint32_t instanceId) noexcept;
+    [[nodiscard]] MeshInstance* FindInstance(std::string_view name) noexcept;
+    void SetInstanceTransform(uint32_t instanceId, const Motor& transform);
+    void SetInstancePosition(uint32_t instanceId, const TriVector& position);
+    void SetInstanceVisible(uint32_t instanceId, bool visible);
 
-    uint32_t addSphere(const TriVector& center, float radius, const Scene::Material& material);
-    uint32_t addPlane(const Vector& plane, const Scene::Material& material);
-    uint32_t addSphere(float x, float y, float z, float radius, const Scene::Material& material);
-    uint32_t addPlane(float nx, float ny, float nz, float distance, const Scene::Material& material);
-    uint32_t addGroundPlane(float height, const Scene::Material& material);
-    [[nodiscard]] Scene::GPUSphere* getSphere(uint32_t id) noexcept;
-    [[nodiscard]] Scene::GPUPlane* getPlane(uint32_t id) noexcept;
+    uint32_t AddSphere(const TriVector& center, float radius, const Scene::Material& material);
+    uint32_t AddPlane(const Vector& plane, const Scene::Material& material);
+    uint32_t AddSphere(float x, float y, float z, float radius, const Scene::Material& material);
+    uint32_t AddPlane(float nx, float ny, float nz, float distance, const Scene::Material& material);
+    uint32_t AddGroundPlane(float height, const Scene::Material& material);
+    [[nodiscard]] Scene::GPUSphere* GetSphere(uint32_t id) noexcept;
+    [[nodiscard]] Scene::GPUPlane* GetPlane(uint32_t id) noexcept;
 
-    void setSphereMaterial(uint32_t id, const Scene::Material& material);
-    void setPlaneMaterial(uint32_t id, const Scene::Material& material);
+    void SetSphereMaterial(uint32_t id, const Scene::Material& material);
+    void SetPlaneMaterial(uint32_t id, const Scene::Material& material);
 
-    uint32_t addDirectionalLight(const TriVector& direction, const Scene::Color& color, float intensity);
-    uint32_t addPointLight(const TriVector& position, const Scene::Color& color, float intensity, float range);
-    uint32_t addSpotLight(const TriVector& position, const TriVector& direction,
+    uint32_t AddDirectionalLight(const TriVector& direction, const Scene::Color& color, float intensity);
+    uint32_t AddPointLight(const TriVector& position, const Scene::Color& color, float intensity, float range);
+    uint32_t AddSpotLight(const TriVector& position, const TriVector& direction,
                           const Scene::Color& color, float intensity, float angle, float range);
-    uint32_t addDirectionalLight(float dx, float dy, float dz, const Scene::Color& color, float intensity);
-    uint32_t addPointLight(float x, float y, float z, const Scene::Color& color, float intensity, float range);
-    uint32_t addSpotLight(float px, float py, float pz, float dx, float dy, float dz,
+    uint32_t AddDirectionalLight(float dx, float dy, float dz, const Scene::Color& color, float intensity);
+    uint32_t AddPointLight(float x, float y, float z, const Scene::Color& color, float intensity, float range);
+    uint32_t AddSpotLight(float px, float py, float pz, float dx, float dy, float dz,
                           const Scene::Color& color, float intensity, float angle, float range);
-    [[nodiscard]] Scene::GPULight* getLight(uint32_t id) noexcept;
+    [[nodiscard]] Scene::GPULight* GetLight(uint32_t id) noexcept;
+
+    // ========================================================================
+    // Debug visualization
+    // ========================================================================
+
+    // Draw debug primitives (rendered as ImGui overlay)
+    void DrawDebugLine(const TriVector& from, const TriVector& to,
+                       const Scene::Color& color = Scene::Color::White());
+    void DrawDebugLine(float x1, float y1, float z1, float x2, float y2, float z2,
+                       const Scene::Color& color = Scene::Color::White());
+
+    // Draw a point as a small cross
+    void DrawDebugPoint(const TriVector& point, float size = 0.1f,
+                        const Scene::Color& color = Scene::Color::White());
+
+    // Draw coordinate axes at a transform
+    void DrawDebugAxes(const TriVector& position, float size = 1.0f);
+    void DrawDebugAxes(const Motor& transform, float size = 1.0f);
+
+    // Draw a line from a BiVector (Plücker line representation)
+    // Creates two points along the line extending 'halfLength' in each direction
+    void DrawDebugLine(const BiVector& line, float halfLength = 10.0f,
+                       const Scene::Color& color = Scene::Color::White());
 
     std::string m_resourceDir;
     Scene::SceneData m_sceneData;
@@ -144,4 +208,15 @@ protected:
     float m_fps{0.0f};
     float m_fpsAccumulator{0.0f};
     uint32_t m_fpsFrameCount{0};
+
+    // Debug drawing
+    std::vector<DebugLine> m_debugLines;
+    bool m_debugDrawEnabled{true};
+
+    // Screen dimensions for debug projection (set by Application)
+    int m_screenWidth{1280};
+    int m_screenHeight{720};
+
+    // Helper for 3D to 2D projection
+    bool ProjectToScreen(const TriVector& worldPos, float& screenX, float& screenY) const;
 };

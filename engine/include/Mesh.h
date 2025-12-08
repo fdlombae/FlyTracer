@@ -32,7 +32,7 @@ struct Material {
     std::string diffuseTexturePath;
     std::string specularTexturePath;
 
-    [[nodiscard]] Scene::GPUMaterial toGPU() const noexcept {
+    [[nodiscard]] Scene::GPUMaterial ToGPU() const noexcept {
         Scene::GPUMaterial gpu{};
         gpu.diffuse[0] = diffuse[0];
         gpu.diffuse[1] = diffuse[1];
@@ -91,7 +91,7 @@ struct Vertex {
     float texCoord[2];
     float _pad[2];
 
-    [[nodiscard]] GPUVertex toGPU() const noexcept {
+    [[nodiscard]] GPUVertex ToGPU() const noexcept {
         return GPUVertex{
             position.e032(), position.e013(), position.e021(), texCoord[0],
             normal.e1(), normal.e2(), normal.e3(), texCoord[1]
@@ -114,56 +114,56 @@ public:
     Mesh(Mesh&&) noexcept = default;
     Mesh& operator=(Mesh&&) noexcept = default;
 
-    [[nodiscard]] bool loadFromFile(const std::string& filename);
-    [[nodiscard]] bool loadFromFile(const std::string& objFilename, const std::string& mtlBasePath);
+    [[nodiscard]] bool LoadFromFile(const std::string& filename);
+    [[nodiscard]] bool LoadFromFile(const std::string& objFilename, const std::string& mtlBasePath);
 
-    [[nodiscard]] const std::vector<Vertex>& vertices() const noexcept { return m_vertices; }
-    [[nodiscard]] const std::vector<Triangle>& triangles() const noexcept { return m_triangles; }
-    [[nodiscard]] const std::vector<Material>& materials() const noexcept { return m_materials; }
-    [[nodiscard]] bool empty() const noexcept { return m_vertices.empty(); }
-    [[nodiscard]] size_t vertexCount() const noexcept { return m_vertices.size(); }
-    [[nodiscard]] size_t triangleCount() const noexcept { return m_triangles.size(); }
-    [[nodiscard]] size_t materialCount() const noexcept { return m_materials.size(); }
+    [[nodiscard]] const std::vector<Vertex>& Vertices() const noexcept { return m_vertices; }
+    [[nodiscard]] const std::vector<Triangle>& Triangles() const noexcept { return m_triangles; }
+    [[nodiscard]] const std::vector<Material>& Materials() const noexcept { return m_materials; }
+    [[nodiscard]] bool Empty() const noexcept { return m_vertices.empty(); }
+    [[nodiscard]] size_t VertexCount() const noexcept { return m_vertices.size(); }
+    [[nodiscard]] size_t TriangleCount() const noexcept { return m_triangles.size(); }
+    [[nodiscard]] size_t MaterialCount() const noexcept { return m_materials.size(); }
 
-    void addMaterial(const Material& material);
-    [[nodiscard]] const Material& getMaterial(size_t index) const;
-    [[nodiscard]] Material& getMaterial(size_t index);
-    [[nodiscard]] bool hasMaterial(size_t index) const noexcept { return index < m_materials.size(); }
+    void AddMaterial(const Material& material);
+    [[nodiscard]] const Material& GetMaterial(size_t index) const;
+    [[nodiscard]] Material& GetMaterial(size_t index);
+    [[nodiscard]] bool HasMaterial(size_t index) const noexcept { return index < m_materials.size(); }
 
-    void clear();
-    void clearCPUData();
-    void addVertex(const Vertex& vertex);
-    void addTriangle(const Triangle& triangle);
-    void setVertices(std::vector<Vertex>&& vertices);
-    void setTriangles(std::vector<Triangle>&& triangles);
+    void Clear();
+    void ClearCPUData();
+    void AddVertex(const Vertex& vertex);
+    void AddTriangle(const Triangle& triangle);
+    void SetVertices(std::vector<Vertex>&& vertices);
+    void SetTriangles(std::vector<Triangle>&& triangles);
 
-    void computeNormals();
+    void ComputeNormals();
 
-    void scale(float factor);
-    void translate(float x, float y, float z);
-    void centerOnOrigin();
+    void Scale(float factor);
+    void Translate(float x, float y, float z);
+    void CenterOnOrigin();
 
-    void decimate(float targetRatio);
+    void Decimate(float targetRatio);
 
-    void buildBVH();
-    [[nodiscard]] const std::vector<Scene::BVHNode>& bvhNodes() const noexcept { return m_bvhNodes; }
-    [[nodiscard]] const std::vector<uint32_t>& bvhTriIndices() const noexcept { return m_bvhTriIndices; }
+    void BuildBVH();
+    [[nodiscard]] const std::vector<Scene::BVHNode>& BVHNodes() const noexcept { return m_bvhNodes; }
+    [[nodiscard]] const std::vector<uint32_t>& BVHTriIndices() const noexcept { return m_bvhTriIndices; }
 
     struct BoundingBox {
         float min[3]{0.0f, 0.0f, 0.0f};
         float max[3]{0.0f, 0.0f, 0.0f};
 
-        [[nodiscard]] constexpr float width() const noexcept { return max[0] - min[0]; }
-        [[nodiscard]] constexpr float height() const noexcept { return max[1] - min[1]; }
-        [[nodiscard]] constexpr float depth() const noexcept { return max[2] - min[2]; }
+        [[nodiscard]] constexpr float Width() const noexcept { return max[0] - min[0]; }
+        [[nodiscard]] constexpr float Height() const noexcept { return max[1] - min[1]; }
+        [[nodiscard]] constexpr float Depth() const noexcept { return max[2] - min[2]; }
 
-        constexpr void center(float out[3]) const noexcept {
+        constexpr void Center(float out[3]) const noexcept {
             out[0] = (min[0] + max[0]) * 0.5f;
             out[1] = (min[1] + max[1]) * 0.5f;
             out[2] = (min[2] + max[2]) * 0.5f;
         }
 
-        [[nodiscard]] constexpr bool contains(float x, float y, float z) const noexcept {
+        [[nodiscard]] constexpr bool Contains(float x, float y, float z) const noexcept {
             return x >= min[0] && x <= max[0] &&
                    y >= min[1] && y <= max[1] &&
                    z >= min[2] && z <= max[2];
@@ -175,10 +175,10 @@ public:
         uint32_t indices[3];
     };
 
-    void computePhysicsData();
-    [[nodiscard]] const BoundingBox& boundingBox() const noexcept { return m_boundingBox; }
-    [[nodiscard]] const std::vector<FaceNormal>& faceNormals() const noexcept { return m_faceNormals; }
-    [[nodiscard]] bool hasPhysicsData() const noexcept { return m_hasPhysicsData; }
+    void ComputePhysicsData();
+    [[nodiscard]] const BoundingBox& GetBoundingBox() const noexcept { return m_boundingBox; }
+    [[nodiscard]] const std::vector<FaceNormal>& FaceNormals() const noexcept { return m_faceNormals; }
+    [[nodiscard]] bool HasPhysicsData() const noexcept { return m_hasPhysicsData; }
 
 private:
     void updateNodeBounds(uint32_t nodeIdx);
