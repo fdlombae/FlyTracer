@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include "VulkanRenderer.h"
 #include "Mesh.h"
 #include "Scene.h"
