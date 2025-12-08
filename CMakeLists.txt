@@ -185,7 +185,11 @@ if(GLSLC)
     endforeach()
 
     if(SHADER_OUTPUTS)
-        add_custom_target(Shaders ALL DEPENDS ${SHADER_OUTPUTS})
+        add_custom_target(Shaders ALL DEPENDS ${SHADER_OUTPUTS}
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${SHADER_OUTPUT_DIR}
+                ${CMAKE_BINARY_DIR}/bin/shaders
+        )
         add_dependencies(${PROJECT_NAME} Shaders)
     endif()
 else()
@@ -199,6 +203,9 @@ add_custom_target(CopyResources ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/game/resources
         ${CMAKE_BINARY_DIR}/resources
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/game/resources
+        ${CMAKE_BINARY_DIR}/bin/resources
     COMMENT "Copying game resources"
 )
 add_dependencies(${PROJECT_NAME} CopyResources)

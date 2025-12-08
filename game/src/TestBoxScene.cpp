@@ -1,5 +1,4 @@
 #include "TestBoxScene.h"
-#include "VulkanRenderer.h"
 #include <algorithm>
 #include <cmath>
 #include <imgui.h>
@@ -37,9 +36,9 @@ void TestBoxScene::onInit([[maybe_unused]] VulkanRenderer* renderer) {
 
     // Pheasant mesh
     m_pheasantMeshId = loadMesh("pheasant.obj", "pheasant.png");
-    addMeshInstance(m_pheasantMeshId, TriVector(0.0f, m_pheasantHeight, 0.0f), "sine_wave_pheasant");
+    addMeshInstance(m_pheasantMeshId, TriVector(0.0f, m_pheasantHeight, 0.0f), "pheasant");
 
-    if (auto* pheasant = findInstance("sine_wave_pheasant")) {
+    if (auto* pheasant = findInstance("pheasant")) {
         pheasant->scale = m_pheasantScale;
     }
 
@@ -50,7 +49,7 @@ void TestBoxScene::onInit([[maybe_unused]] VulkanRenderer* renderer) {
     // Camera
     m_cameraEye = TriVector(0.0f, 15.0f, 60.0f);
     m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
-    m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
+    m_cameraUp = TriVector(0.0f, 1.0f, 0.0f, 0.0f);
 
     (void)halfDepth;  // Suppress unused variable warning
 }
@@ -74,7 +73,7 @@ void TestBoxScene::onUpdate(float deltaTime) {
     // Update pheasant
     m_pheasantTime += m_pheasantSpeed * deltaTime;
 
-    if (auto* pheasant = findInstance("sine_wave_pheasant")) {
+    if (auto* pheasant = findInstance("pheasant")) {
         const float pheasantX = std::sin(m_pheasantTime) / 10.0f;
         const Motor translation(1.0f, pheasantX * 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
         pheasant->transform = R * translation * pheasant->transform;

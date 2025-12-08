@@ -11,6 +11,9 @@ lib/
 *.swo
 *~
 
+# Visual Studio files
+.vs/
+
 # CMake
 CMakeCache.txt
 CMakeFiles/
