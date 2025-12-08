@@ -20,16 +20,16 @@ public:
     explicit MyScene(const std::string& resourceDir)
         : GameScene(resourceDir) {}
 
-    void onInit(VulkanRenderer* renderer) override {
+    void OnInit(VulkanRenderer* renderer) override {
         // Add a ground plane
-        addGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color(0.5f, 0.5f, 0.5f)));
+        AddGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color(0.5f, 0.5f, 0.5f)));
 
         // Add a red metallic sphere
-        addSphere(TriVector(0.0f, 2.0f, 0.0f), 2.0f,
+        AddSphere(TriVector(0.0f, 2.0f, 0.0f), 2.0f,
                   Scene::Material::Metal(Scene::Color(0.9f, 0.2f, 0.2f)));
 
         // Add a point light
-        addPointLight(TriVector(5.0f, 10.0f, 5.0f),
+        AddPointLight(TriVector(5.0f, 10.0f, 5.0f),
                       Scene::Color::White(), 1.5f, 50.0f);
 
         // Set camera

@@ -4,29 +4,16 @@ This section covers everything you need to build raytraced scenes in FlyTracer.
 
 ## Topics
 
-<div class="quick-links" markdown>
-
-[**Overview** <br><span>Understand the GameScene lifecycle and architecture</span>](overview.md)
-
-[**Primitives** <br><span>Add spheres and infinite planes to your scene</span>](primitives.md)
-
-[**Materials** <br><span>Configure Flat, Lambert, Phong, and PBR shading</span>](materials.md)
-
-[**Meshes** <br><span>Load OBJ models with textures</span>](meshes.md)
-
-[**Lighting** <br><span>Point, directional, and spot lights</span>](lighting.md)
-
-[**Camera** <br><span>Eye-target-up camera setup and controls</span>](camera.md)
-
-[**Animation** <br><span>Transform objects with PGA Motors</span>](animation.md)
-
-[**Input Handling** <br><span>Handle mouse and keyboard input</span>](input.md)
-
-[**Debug UI** <br><span>Create ImGui debug interfaces</span>](imgui.md)
-
-[**Debug Visualization** <br><span>Draw debug lines, points, and axes</span>](debug.md)
-
-</div>
+- [**Overview**](overview.md) - Understand the GameScene lifecycle and architecture
+- [**Primitives**](primitives.md) - Add spheres and infinite planes to your scene
+- [**Materials**](materials.md) - Configure Flat, Lambert, Phong, and PBR shading
+- [**Meshes**](meshes.md) - Load OBJ models with textures
+- [**Lighting**](lighting.md) - Point, directional, and spot lights
+- [**Camera**](camera.md) - Eye-target-up camera setup and controls
+- [**Animation**](animation.md) - Transform objects with PGA Motors
+- [**Input Handling**](input.md) - Handle mouse and keyboard input
+- [**Debug UI**](imgui.md) - Create ImGui debug interfaces
+- [**Debug Visualization**](debug.md) - Draw debug lines, points, and axes
 
 ## Minimal Example
 

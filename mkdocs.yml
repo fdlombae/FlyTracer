@@ -61,4 +61,5 @@ nav:
     - Animation: scenes/animation.md
     - Input Handling: scenes/input.md
     - Debug UI: scenes/imgui.md
+    - Debug Visualization: scenes/debug.md
   - PGA Basics: pga.md
