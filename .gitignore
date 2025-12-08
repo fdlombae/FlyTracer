@@ -1,8 +1,11 @@
 # Build directories
-build/
+build*/
 cmake-build-*/
+site/
 bin/
 lib/
+
+external/
 
 # IDE files
 .idea/

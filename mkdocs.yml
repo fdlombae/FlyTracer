@@ -3,6 +3,7 @@ site_description: Vulkan Compute Shader Raytracer Documentation
 site_url: https://fdlombae.github.io/FlyTracer/
 repo_url: https://github.com/fdlombae/FlyTracer
 repo_name: fdlombae/FlyTracer
+use_directory_urls: false
 
 theme:
   name: material

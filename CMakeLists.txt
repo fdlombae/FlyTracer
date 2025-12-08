@@ -73,6 +73,30 @@ set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 # Fetch all dependencies
 FetchContent_MakeAvailable(SDL3 tinyobjloader imgui googletest)
 
+# =============================================================================
+# Initialize git submodules if not present
+# =============================================================================
+find_package(Git QUIET)
+if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+    # Check if FlyFish submodule is initialized
+    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/FlyFish/CMakeLists.txt")
+        message(STATUS "Initializing FlyFish submodule...")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive external/FlyFish
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+            RESULT_VARIABLE GIT_SUBMOD_RESULT
+        )
+        if(NOT GIT_SUBMOD_RESULT EQUAL "0")
+            message(FATAL_ERROR "git submodule update --init failed with ${GIT_SUBMOD_RESULT}")
+        endif()
+    endif()
+endif()
+
+# Verify FlyFish exists
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/FlyFish/CMakeLists.txt")
+    message(FATAL_ERROR "FlyFish submodule not found. Please run: git submodule update --init --recursive")
+endif()
+
 # Add FlyFish library (local)
 add_subdirectory(external/FlyFish)
 
