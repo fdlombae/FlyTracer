@@ -22,8 +22,13 @@ theme:
   features:
     - navigation.sections
     - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - toc.integrate
     - content.code.copy
     - content.code.annotate
+    - search.highlight
+    - search.suggest
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -35,13 +40,18 @@ markdown_extensions:
   - pymdownx.details
   - attr_list
   - md_in_html
+  - def_list
   - toc:
       permalink: true
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Creating Scenes:
+    - scenes/index.md
     - Overview: scenes/overview.md
     - Primitives: scenes/primitives.md
     - Materials: scenes/materials.md
