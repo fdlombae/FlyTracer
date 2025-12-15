@@ -172,6 +172,8 @@ private:
     VkDeviceMemory m_materialBufferMemory{VK_NULL_HANDLE};
     VkBuffer m_textureBuffer{VK_NULL_HANDLE};
     VkDeviceMemory m_textureBufferMemory{VK_NULL_HANDLE};
+    VkBuffer m_textureInfoBuffer{VK_NULL_HANDLE};
+    VkDeviceMemory m_textureInfoBufferMemory{VK_NULL_HANDLE};
     uint32_t m_textureWidth{0};
     uint32_t m_textureHeight{0};
     VkBuffer m_instanceMotorBuffer{VK_NULL_HANDLE};

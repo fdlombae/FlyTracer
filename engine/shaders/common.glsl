@@ -124,6 +124,14 @@ struct MeshInstance {
     vec2 _pad;
 };
 
+// Texture info - per-texture metadata for multi-texture support (16 bytes)
+struct TextureInfo {
+    uint offset;            // Offset into texture data buffer (in vec4 pixels)
+    uint width;             // Texture width
+    uint height;            // Texture height
+    uint _pad;              // Padding to 16 bytes
+};
+
 // Mesh info - per-mesh offsets for multi-mesh support (32 bytes)
 struct MeshInfo {
     uint vertexOffset;      // Offset into vertex buffer

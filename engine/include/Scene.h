@@ -345,6 +345,16 @@ struct alignas(16) GPUMaterial {
 };
 
 // ============================================================================
+// GPU Texture Info structure - per-texture metadata for multi-texture support (16 bytes)
+// ============================================================================
+struct alignas(16) GPUTextureInfo {
+    uint32_t offset{0};     // Offset into texture data buffer (in vec4 pixels)
+    uint32_t width{1};      // Texture width
+    uint32_t height{1};     // Texture height
+    uint32_t _pad{0};       // Padding to 16 bytes
+};
+
+// ============================================================================
 // GPU Mesh Info structure - per-mesh offsets for multi-mesh support (32 bytes)
 // ============================================================================
 struct alignas(16) GPUMeshInfo {
