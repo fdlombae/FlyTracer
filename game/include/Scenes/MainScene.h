@@ -41,4 +41,6 @@ private:
     float m_pheasantAmplitudeZ{10.0f};
     float m_pheasantHeight{0.0f};
     float m_pheasantScale{0.5f};
+
+    void ProcessMovement(InputState const& input);
 };

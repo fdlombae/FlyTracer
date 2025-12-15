@@ -32,7 +32,7 @@ Application::Application(int width, int height, const std::string& title,
     rendererConfig.enableValidation = true;
 #endif
     rendererConfig.shaderDir = m_shaderDir;
-    m_renderer = std::make_unique<VulkanRenderer>(m_window, rendererConfig);
+    m_renderer = std::make_unique<VulkanRenderer>(m_pWindow, rendererConfig);
 
     // Initialize scene (scene loads its own meshes)
     m_gameScene->OnInit(m_renderer.get());
@@ -90,11 +90,13 @@ void Application::initSDL() {
         throw std::runtime_error("Failed to initialize SDL: " + std::string(SDL_GetError()));
     }
 
-    m_window = SDL_CreateWindow(m_title.c_str(), m_width, m_height, SDL_WINDOW_VULKAN);
-    if (!m_window) {
+    m_pWindow = SDL_CreateWindow(m_title.c_str(), m_width, m_height, SDL_WINDOW_VULKAN);
+    if (!m_pWindow) {
         SDL_Quit();
         throw std::runtime_error("Failed to create window: " + std::string(SDL_GetError()));
     }
+
+    SDL_SetWindowRelativeMouseMode(m_pWindow, true);
 }
 
 
@@ -456,8 +458,8 @@ void Application::cleanup() {
     // VulkanRenderer cleanup handled by unique_ptr
 
     // Cleanup SDL
-    if (m_window) {
-        SDL_DestroyWindow(m_window);
+    if (m_pWindow) {
+        SDL_DestroyWindow(m_pWindow);
     }
     SDL_Quit();
 }
