@@ -1,4 +1,4 @@
-#include "DebugDemoScene.h"
+#include "../include/Scenes/DebugDemoScene.h"
 #include <algorithm>
 #include <cmath>
 #include <imgui.h>

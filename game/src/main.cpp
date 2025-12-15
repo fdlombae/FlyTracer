@@ -1,7 +1,6 @@
 #include "Application.h"
 #include "Config.h"
-#include "TestBoxScene.h"
-#include "DebugDemoScene.h"
+#include "Scenes/Scenes.h"
 #include <iostream>
 #include <memory>
 #include <string_view>
