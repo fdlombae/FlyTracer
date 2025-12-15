@@ -174,6 +174,7 @@ private:
     uint32_t m_textureHeight{0};
     VkBuffer m_instanceMotorBuffer{VK_NULL_HANDLE};
     VkDeviceMemory m_instanceMotorBufferMemory{VK_NULL_HANDLE};
+    uint32_t m_instanceBufferCapacity{0};  // Track allocated capacity for dynamic resize
 
     // Storage image layout tracking
     VkImageLayout m_storageImageLayout{VK_IMAGE_LAYOUT_UNDEFINED};

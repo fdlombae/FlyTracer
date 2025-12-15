@@ -36,6 +36,8 @@ void TestBoxScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
     // Pheasant mesh
     m_pheasantMeshId = LoadMesh("pheasant.obj", "pheasant.png");
     AddMeshInstance(m_pheasantMeshId, TriVector(0.0f, m_pheasantHeight, 0.0f), "pheasant");
+    AddMeshInstance(m_pheasantMeshId, TriVector(5.0f, m_pheasantHeight, 0.0f), "pheasant2");
+
 
     if (auto* pheasant = FindInstance("pheasant")) {
         pheasant->scale = m_pheasantScale;

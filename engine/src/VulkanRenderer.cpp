@@ -809,11 +809,30 @@ void VulkanRenderer::UploadSceneData(const Scene::SceneData& sceneData) {
     defaultInstances.push_back(Scene::GPUMeshInstance::identity(0));  // Single identity instance
     VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
                                    defaultInstances, m_instanceMotorBuffer, m_instanceMotorBufferMemory);
+    m_instanceBufferCapacity = 1;
 }
 
 void VulkanRenderer::UploadInstances(const std::vector<MeshInstance>& instances) {
     if (instances.empty()) {
         return;  // Keep default identity instance
+    }
+
+    const auto instanceCount = static_cast<uint32_t>(instances.size());
+
+    // Check if we need to reallocate the buffer (instance count exceeds capacity)
+    if (instanceCount > m_instanceBufferCapacity) {
+        // Wait for GPU to finish using the old buffer
+        vkDeviceWaitIdle(m_device);
+
+        // Free old buffer
+        if (m_instanceMotorBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(m_device, m_instanceMotorBuffer, nullptr);
+            m_instanceMotorBuffer = VK_NULL_HANDLE;
+        }
+        if (m_instanceMotorBufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(m_device, m_instanceMotorBufferMemory, nullptr);
+            m_instanceMotorBufferMemory = VK_NULL_HANDLE;
+        }
     }
 
     std::vector<Scene::GPUMeshInstance> gpuInstances;
@@ -932,8 +951,32 @@ void VulkanRenderer::UploadInstances(const std::vector<MeshInstance>& instances)
         VulkanHelpers::updateBufferData(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
                                         gpuInstances, m_instanceMotorBuffer);
     } else {
+        // Buffer was reallocated - create new buffer and update descriptor set
         VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
                                        gpuInstances, m_instanceMotorBuffer, m_instanceMotorBufferMemory);
+
+        // Track the new buffer capacity
+        m_instanceBufferCapacity = instanceCount;
+
+        // Update descriptor set to point to new buffer (binding 10)
+        // Only if descriptor set already exists (not during initial setup)
+        if (m_descriptorSet != VK_NULL_HANDLE) {
+            VkDescriptorBufferInfo instanceMotorBufferInfo{};
+            instanceMotorBufferInfo.buffer = m_instanceMotorBuffer;
+            instanceMotorBufferInfo.offset = 0;
+            instanceMotorBufferInfo.range = VK_WHOLE_SIZE;
+
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = m_descriptorSet;
+            descriptorWrite.dstBinding = 10;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &instanceMotorBufferInfo;
+
+            vkUpdateDescriptorSets(m_device, 1, &descriptorWrite, 0, nullptr);
+        }
     }
 
 }
