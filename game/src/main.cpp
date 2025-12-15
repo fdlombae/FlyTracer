@@ -5,6 +5,7 @@
 #include <memory>
 #include <string_view>
 #include <cstdlib>
+#include <map>
 
 namespace {
 
@@ -25,9 +26,14 @@ void printHelp() {
 std::unique_ptr<GameScene> createScene(const std::string& name, const std::string& resourceDir) {
     if (name == "testbox") {
         return std::make_unique<TestBoxScene>(resourceDir);
-    } else if (name == "debug") {
+    }
+    if (name == "debug") {
         return std::make_unique<DebugDemoScene>(resourceDir);
     }
+    if (name == "main") {
+        return std::make_unique<MainScene>(resourceDir);
+    }
+
     std::cerr << "Unknown scene '" << name << "', using debug scene\n";
     return std::make_unique<DebugDemoScene>(resourceDir);
 }

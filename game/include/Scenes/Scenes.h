@@ -2,4 +2,5 @@
 #define SCENES_H
 #include "DebugDemoScene.h"
 #include "TestBoxScene.h"
+#include "MainScene.h"
 #endif

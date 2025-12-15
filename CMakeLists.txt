@@ -166,6 +166,8 @@ add_executable(${PROJECT_NAME}
     game/src/TestBoxScene.cpp
     game/src/DebugDemoScene.cpp
         game/include/Scenes/Scenes.h
+        game/include/Scenes/MainScene.h
+        game/src/MainScene.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
