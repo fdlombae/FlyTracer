@@ -345,6 +345,19 @@ struct alignas(16) GPUMaterial {
 };
 
 // ============================================================================
+// GPU Mesh Info structure - per-mesh offsets for multi-mesh support (32 bytes)
+// ============================================================================
+struct alignas(16) GPUMeshInfo {
+    uint32_t vertexOffset{0};      // Offset into vertex buffer
+    uint32_t triangleOffset{0};    // Offset into triangle buffer
+    uint32_t bvhNodeOffset{0};     // Offset into BVH node buffer
+    uint32_t bvhTriIdxOffset{0};   // Offset into BVH triangle index buffer
+    uint32_t triangleCount{0};     // Number of triangles in this mesh
+    uint32_t bvhNodeCount{0};      // Number of BVH nodes in this mesh
+    uint32_t _pad[2]{0, 0};        // Padding to 32 bytes
+};
+
+// ============================================================================
 // GPU Mesh Instance structure (144 bytes, 16-byte aligned)
 // ============================================================================
 struct alignas(16) GPUMeshInstance {

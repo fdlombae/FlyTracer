@@ -160,6 +160,8 @@ private:
     VkDeviceMemory m_bvhNodeBufferMemory{VK_NULL_HANDLE};
     VkBuffer m_bvhTriIdxBuffer{VK_NULL_HANDLE};
     VkDeviceMemory m_bvhTriIdxBufferMemory{VK_NULL_HANDLE};
+    VkBuffer m_meshInfoBuffer{VK_NULL_HANDLE};
+    VkDeviceMemory m_meshInfoBufferMemory{VK_NULL_HANDLE};
     VkBuffer m_sphereBuffer{VK_NULL_HANDLE};
     VkDeviceMemory m_sphereBufferMemory{VK_NULL_HANDLE};
     VkBuffer m_planeBuffer{VK_NULL_HANDLE};

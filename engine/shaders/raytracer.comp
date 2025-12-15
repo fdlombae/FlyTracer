@@ -20,6 +20,7 @@ layout (binding = 7) readonly buffer BVHNodeBuffer { BVHNode bvhNodes[]; };
 layout (binding = 8) readonly buffer BVHTriIdxBuffer { uint bvhTriIndices[]; };
 layout (binding = 9) readonly buffer TextureBuffer { vec4 textureData[]; };
 layout (binding = 10) readonly buffer InstanceBuffer { MeshInstance instances[]; };
+layout (binding = 11) readonly buffer MeshInfoBuffer { MeshInfo meshInfos[]; };
 
 layout (push_constant) uniform PushConstants {
     float time;
@@ -94,12 +95,15 @@ float transformRayToObjectSpace(Ray worldRay, mat4 invTransform, out Ray localRa
 
 // BVH traversal - finds closest hit and fills in HitInfo
 // dirScale: factor to convert local t to world t (local_t / dirScale = world_t)
+// meshId: which mesh's BVH to traverse (used to get root node offset)
 // Returns true if any triangle was hit
-bool traverseBVH(Ray localRay, float dirScale, inout HitInfo hit, uint instIdx, mat4 transform, mat4 invTransform) {
+bool traverseBVH(Ray localRay, float dirScale, inout HitInfo hit, uint instIdx, mat4 transform, mat4 invTransform, uint meshId) {
     bool anyHit = false;
     int stack[32];
     int stackPtr = 0;
-    stack[stackPtr++] = 0;
+    // Start at the root node for this mesh
+    int rootNode = int(meshInfos[meshId].bvhNodeOffset);
+    stack[stackPtr++] = rootNode;
 
     // Convert world-space t threshold to local-space for comparisons
     float localMaxT = hit.t * dirScale;
@@ -162,10 +166,13 @@ bool traverseBVH(Ray localRay, float dirScale, inout HitInfo hit, uint instIdx, 
 }
 
 // BVH any-hit query - returns true as soon as any intersection is found (for shadows)
-bool traverseBVHAnyHit(Ray localRay, float maxDist) {
+// meshId: which mesh's BVH to traverse (used to get root node offset)
+bool traverseBVHAnyHit(Ray localRay, float maxDist, uint meshId) {
     int stack[16];
     int stackPtr = 0;
-    stack[stackPtr++] = 0;
+    // Start at the root node for this mesh
+    int rootNode = int(meshInfos[meshId].bvhNodeOffset);
+    stack[stackPtr++] = rootNode;
 
     while (stackPtr > 0) {
         int nodeIdx = stack[--stackPtr];
@@ -241,7 +248,7 @@ HitInfo traceScene(Ray ray) {
         if (inst.visible == 0) continue;
         Ray localRay;
         float dirScale = transformRayToObjectSpace(ray, inst.invTransform, localRay);
-        traverseBVH(localRay, dirScale, hit, instIdx, inst.transform, inst.invTransform);
+        traverseBVH(localRay, dirScale, hit, instIdx, inst.transform, inst.invTransform, inst.meshId);
     }
 
     // Fallback: direct triangle testing if no instances
@@ -298,7 +305,7 @@ bool isInShadow(vec3 position, vec3 normal, vec3 lightDir, float maxDist, int sk
         Ray localRay;
         float dirScale = transformRayToObjectSpace(shadowRay, inst.invTransform, localRay);
         // Convert world maxDist to local space for comparison
-        if (traverseBVHAnyHit(localRay, maxDist * dirScale)) return true;
+        if (traverseBVHAnyHit(localRay, maxDist * dirScale, inst.meshId)) return true;
     }
 
     return false;

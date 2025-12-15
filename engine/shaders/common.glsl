@@ -124,6 +124,17 @@ struct MeshInstance {
     vec2 _pad;
 };
 
+// Mesh info - per-mesh offsets for multi-mesh support (32 bytes)
+struct MeshInfo {
+    uint vertexOffset;      // Offset into vertex buffer
+    uint triangleOffset;    // Offset into triangle buffer
+    uint bvhNodeOffset;     // Offset into BVH node buffer
+    uint bvhTriIdxOffset;   // Offset into BVH triangle index buffer
+    uint triangleCount;     // Number of triangles in this mesh
+    uint bvhNodeCount;      // Number of BVH nodes in this mesh
+    uvec2 _pad;             // Padding to 32 bytes
+};
+
 // Hit information
 struct HitInfo {
     bool hit;
