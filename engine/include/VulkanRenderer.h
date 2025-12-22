@@ -204,6 +204,7 @@ private:
     uint32_t m_imageIndex{0};
     bool m_frameStarted{false};
     bool m_meshesUploaded{false};
+    uint32_t m_uploadedMaterialCount{0};  // Material count from UploadMeshes
 
     // Modern Vulkan 1.3 extension function pointers (loaded dynamically for MoltenVK compatibility)
     PFN_vkQueueSubmit2KHR m_vkQueueSubmit2KHR{nullptr};

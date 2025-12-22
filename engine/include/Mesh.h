@@ -138,6 +138,8 @@ public:
     void SetTriangles(std::vector<Triangle>&& triangles);
 
     void ComputeNormals();
+    void GenerateCylindricalUVs();
+    [[nodiscard]] bool HasUVCoordinates() const noexcept;
 
     void Scale(float factor);
     void Translate(float x, float y, float z);

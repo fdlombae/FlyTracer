@@ -121,3 +121,30 @@ void MyScene::OnUpdate(float deltaTime) {
     }
 }
 ```
+
+### Incremental Rotation + Translation per Frame
+
+To accumulate transformations over time (e.g., an object that continuously rotates while drifting), compose both the rotation and translation with the existing transform:
+
+```cpp
+void MyScene::OnUpdate(float deltaTime) {
+    // Small rotation increment per frame
+    float incrementDegrees = m_rotationSpeed * deltaTime * 57.3f;
+    BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+    Motor R = Motor::Rotation(incrementDegrees, yAxis);
+
+    // Small translation increment (e.g., sine wave drift)
+    float dx = std::sin(m_time) * 0.1f;
+    Motor translation(1.0f, dx * 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+
+    if (auto* pheasant = FindInstance("pheasant")) {
+        // Compose: new rotation * new translation * existing transform
+        // This accumulates both rotation and translation each frame
+        pheasant->transform = R * translation * pheasant->transform;
+    }
+}
+```
+
+**Key insight**: Multiplying `R * translation * existing_transform` applies the incremental rotation and translation on top of the current state. Over many frames, the object will:
+- Continuously rotate (rotation accumulates)
+- Drift according to the translation pattern (translation accumulates)

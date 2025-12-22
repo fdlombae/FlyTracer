@@ -43,10 +43,14 @@ uint32_t GameScene::LoadMesh(std::string_view objFilename, std::string_view text
     }
 
     if (!textureFilename.empty()) {
+        // Generate cylindrical UVs if the mesh lacks texture coordinates
+        if (!mesh->HasUVCoordinates()) {
+            mesh->GenerateCylindricalUVs();
+        }
+
         std::string fullTexturePath = m_resourceDir + "/" + std::string(textureFilename);
         for (size_t i = 0; i < mesh->MaterialCount(); ++i) {
             mesh->GetMaterial(i).diffuseTexturePath = fullTexturePath;
-            mesh->GetMaterial(i).diffuseTextureIndex = 0;
         }
     }
 

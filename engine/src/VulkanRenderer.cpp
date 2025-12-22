@@ -321,7 +321,9 @@ void VulkanRenderer::RenderScene(const Scene::SceneData& sceneData,
     m_pushConstants.sphereCount = static_cast<uint32_t>(sceneData.spheres.size());
     m_pushConstants.planeCount = static_cast<uint32_t>(sceneData.planes.size());
     m_pushConstants.lightCount = static_cast<uint32_t>(sceneData.lights.size());
-    m_pushConstants.materialCount = sceneData.materials.empty() ? 1 : static_cast<uint32_t>(sceneData.materials.size());
+    // Use material count from UploadMeshes if available, otherwise fall back to scene data
+    m_pushConstants.materialCount = m_uploadedMaterialCount > 0 ? m_uploadedMaterialCount :
+        (sceneData.materials.empty() ? 1 : static_cast<uint32_t>(sceneData.materials.size()));
     m_pushConstants.instanceCount = static_cast<uint32_t>(instances.size());
     m_pushConstants.planeTileScale = 0.1f;  // Tile scale for plane UV mapping
 
@@ -650,6 +652,10 @@ void VulkanRenderer::UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
         VulkanHelpers::createBuffer(m_device, m_physicalDevice, dummySize,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            m_textureBuffer, m_textureBufferMemory);
+        VulkanHelpers::createBuffer(m_device, m_physicalDevice, dummySize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             m_textureInfoBuffer, m_textureInfoBufferMemory);
         return;
     }
@@ -866,7 +872,8 @@ void VulkanRenderer::UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
     std::vector<Scene::GPUTextureInfo> textureInfos;
     uint32_t textureOffset = 0;
 
-    for (const auto& texPath : texturePaths) {
+    for (size_t i = 0; i < texturePaths.size(); ++i) {
+        const auto& texPath = texturePaths[i];
         int texWidth, texHeight, texChannels;
         stbi_uc* pixels = stbi_load(texPath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
@@ -922,6 +929,8 @@ void VulkanRenderer::UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
     m_textureWidth = textureInfos[0].width;
     m_textureHeight = textureInfos[0].height;
 
+    // Track material count for shader to use correct bounds
+    m_uploadedMaterialCount = static_cast<uint32_t>(allMaterials.size());
     m_meshesUploaded = true;
 }
 
