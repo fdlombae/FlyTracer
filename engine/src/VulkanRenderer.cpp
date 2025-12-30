@@ -15,6 +15,7 @@
 #include <vector>
 #include <algorithm>
 #include <set>
+#include <unordered_map>
 
 // ============================================================================
 // Constants and Helper Functions (moved from Application.cpp)
@@ -320,7 +321,9 @@ void VulkanRenderer::RenderScene(const Scene::SceneData& sceneData,
     m_pushConstants.sphereCount = static_cast<uint32_t>(sceneData.spheres.size());
     m_pushConstants.planeCount = static_cast<uint32_t>(sceneData.planes.size());
     m_pushConstants.lightCount = static_cast<uint32_t>(sceneData.lights.size());
-    m_pushConstants.materialCount = sceneData.materials.empty() ? 1 : static_cast<uint32_t>(sceneData.materials.size());
+    // Use material count from UploadMeshes if available, otherwise fall back to scene data
+    m_pushConstants.materialCount = m_uploadedMaterialCount > 0 ? m_uploadedMaterialCount :
+        (sceneData.materials.empty() ? 1 : static_cast<uint32_t>(sceneData.materials.size()));
     m_pushConstants.instanceCount = static_cast<uint32_t>(instances.size());
     m_pushConstants.planeTileScale = 0.1f;  // Tile scale for plane UV mapping
 
@@ -606,6 +609,14 @@ void VulkanRenderer::UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
             vkFreeMemory(m_device, m_bvhTriIdxBufferMemory, nullptr);
             m_bvhTriIdxBufferMemory = VK_NULL_HANDLE;
         }
+        if (m_meshInfoBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(m_device, m_meshInfoBuffer, nullptr);
+            m_meshInfoBuffer = VK_NULL_HANDLE;
+        }
+        if (m_meshInfoBufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(m_device, m_meshInfoBufferMemory, nullptr);
+            m_meshInfoBufferMemory = VK_NULL_HANDLE;
+        }
     };
 
     cleanupExistingBuffers();
@@ -634,23 +645,140 @@ void VulkanRenderer::UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             m_bvhTriIdxBuffer, m_bvhTriIdxBufferMemory);
+        VulkanHelpers::createBuffer(m_device, m_physicalDevice, dummySize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            m_meshInfoBuffer, m_meshInfoBufferMemory);
+        VulkanHelpers::createBuffer(m_device, m_physicalDevice, dummySize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            m_textureBuffer, m_textureBufferMemory);
+        VulkanHelpers::createBuffer(m_device, m_physicalDevice, dummySize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            m_textureInfoBuffer, m_textureInfoBufferMemory);
         return;
     }
 
-    // Use the first mesh as the primary mesh for rendering
-    const auto& mesh = meshes[0];
-    const auto& vertices = mesh->Vertices();
-    const auto& triangles = mesh->Triangles();
+    // Concatenate all mesh data and track per-mesh offsets
+    std::vector<GPUVertex> allVertices;
+    std::vector<Triangle> allTriangles;
+    std::vector<Scene::BVHNode> allBvhNodes;
+    std::vector<uint32_t> allBvhTriIndices;
+    std::vector<Scene::GPUMeshInfo> meshInfos;
+    std::vector<Scene::GPUMaterial> allMaterials;
 
-    // Convert CPU vertices to GPU-compatible format
-    std::vector<GPUVertex> gpuVertices;
-    gpuVertices.reserve(vertices.size());
-    for (const auto& v : vertices) {
-        gpuVertices.push_back(v.ToGPU());
+    // Collect unique texture paths and map to indices
+    std::vector<std::string> texturePaths;
+    std::unordered_map<std::string, int32_t> texturePathToIndex;
+
+    uint32_t vertexOffset = 0;
+    uint32_t triangleOffset = 0;
+    uint32_t bvhNodeOffset = 0;
+    uint32_t bvhTriIdxOffset = 0;
+    uint32_t materialOffset = 0;
+
+    for (const auto& mesh : meshes) {
+        if (!mesh) continue;
+
+        Scene::GPUMeshInfo info{};
+        info.vertexOffset = vertexOffset;
+        info.triangleOffset = triangleOffset;
+        info.bvhNodeOffset = bvhNodeOffset;
+        info.bvhTriIdxOffset = bvhTriIdxOffset;
+
+        // Add vertices
+        const auto& vertices = mesh->Vertices();
+        for (const auto& v : vertices) {
+            allVertices.push_back(v.ToGPU());
+        }
+
+        // Add materials and track texture indices
+        for (size_t i = 0; i < mesh->MaterialCount(); ++i) {
+            const auto& mat = mesh->GetMaterial(i);
+            Scene::GPUMaterial gpuMat = mat.ToGPU();
+
+            // Handle texture path
+            if (!mat.diffuseTexturePath.empty()) {
+                auto it = texturePathToIndex.find(mat.diffuseTexturePath);
+                if (it == texturePathToIndex.end()) {
+                    // New texture - add to list
+                    int32_t texIdx = static_cast<int32_t>(texturePaths.size());
+                    texturePaths.push_back(mat.diffuseTexturePath);
+                    texturePathToIndex[mat.diffuseTexturePath] = texIdx;
+                    gpuMat.diffuseTextureIndex = texIdx;
+                } else {
+                    gpuMat.diffuseTextureIndex = it->second;
+                }
+            } else {
+                gpuMat.diffuseTextureIndex = -1;
+            }
+
+            allMaterials.push_back(gpuMat);
+        }
+
+        // Add triangles with adjusted vertex AND material indices
+        const auto& triangles = mesh->Triangles();
+        for (const auto& tri : triangles) {
+            Triangle adjustedTri = tri;
+            adjustedTri.indices[0] += vertexOffset;
+            adjustedTri.indices[1] += vertexOffset;
+            adjustedTri.indices[2] += vertexOffset;
+            adjustedTri.materialIndex += materialOffset;
+            allTriangles.push_back(adjustedTri);
+        }
+        info.triangleCount = static_cast<uint32_t>(triangles.size());
+
+        // Add BVH nodes with adjusted child/triangle indices
+        const auto& bvhNodes = mesh->BVHNodes();
+        for (const auto& node : bvhNodes) {
+            Scene::BVHNode adjustedNode = node;
+            if (node.triCount > 0) {
+                // Leaf node: leftFirst is index into bvhTriIndices
+                adjustedNode.leftFirst += static_cast<int32_t>(bvhTriIdxOffset);
+            } else {
+                // Internal node: leftFirst is index of left child node
+                adjustedNode.leftFirst += static_cast<int32_t>(bvhNodeOffset);
+            }
+            allBvhNodes.push_back(adjustedNode);
+        }
+        info.bvhNodeCount = static_cast<uint32_t>(bvhNodes.size());
+
+        // Add BVH triangle indices with adjusted triangle offsets
+        const auto& bvhTriIndices = mesh->BVHTriIndices();
+        for (uint32_t idx : bvhTriIndices) {
+            allBvhTriIndices.push_back(idx + triangleOffset);
+        }
+
+        // Update offsets for next mesh
+        vertexOffset += static_cast<uint32_t>(vertices.size());
+        triangleOffset += static_cast<uint32_t>(triangles.size());
+        bvhNodeOffset += static_cast<uint32_t>(bvhNodes.size());
+        bvhTriIdxOffset += static_cast<uint32_t>(bvhTriIndices.size());
+        materialOffset += static_cast<uint32_t>(mesh->MaterialCount());
+
+        meshInfos.push_back(info);
     }
 
-    VkDeviceSize vertexBufferSize = sizeof(GPUVertex) * gpuVertices.size();
-    VkDeviceSize indexBufferSize = sizeof(Triangle) * triangles.size();
+    // Ensure we have at least one mesh info entry and one material
+    if (meshInfos.empty()) {
+        meshInfos.push_back(Scene::GPUMeshInfo{});
+    }
+    if (allMaterials.empty()) {
+        Scene::GPUMaterial defaultMat{};
+        defaultMat.diffuse[0] = 0.8f;
+        defaultMat.diffuse[1] = 0.8f;
+        defaultMat.diffuse[2] = 0.8f;
+        defaultMat.shininess = 32.0f;
+        defaultMat.shadingMode = static_cast<int32_t>(Scene::ShadingMode::PBR);
+        defaultMat.diffuseTextureIndex = -1;
+        defaultMat.metalness = 0.0f;
+        defaultMat.roughness = 0.5f;
+        allMaterials.push_back(defaultMat);
+    }
+
+    VkDeviceSize vertexBufferSize = sizeof(GPUVertex) * allVertices.size();
+    VkDeviceSize indexBufferSize = sizeof(Triangle) * allTriangles.size();
 
     // Create staging buffers
     VkBuffer vertexStagingBuffer, indexStagingBuffer;
@@ -667,11 +795,11 @@ void VulkanRenderer::UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
     // Copy GPU-compatible vertex data to staging buffer
     void* data;
     vkMapMemory(m_device, vertexStagingMemory, 0, vertexBufferSize, 0, &data);
-    std::memcpy(data, gpuVertices.data(), vertexBufferSize);
+    std::memcpy(data, allVertices.data(), vertexBufferSize);
     vkUnmapMemory(m_device, vertexStagingMemory);
 
     vkMapMemory(m_device, indexStagingMemory, 0, indexBufferSize, 0, &data);
-    std::memcpy(data, triangles.data(), indexBufferSize);
+    std::memcpy(data, allTriangles.data(), indexBufferSize);
     vkUnmapMemory(m_device, indexStagingMemory);
 
     // Create device local buffers
@@ -724,16 +852,85 @@ void VulkanRenderer::UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
     vkFreeMemory(m_device, indexStagingMemory, nullptr);
 
     // Create BVH buffers
-    const auto& bvhNodes = mesh->BVHNodes();
-    const auto& bvhTriIndices = mesh->BVHTriIndices();
-
-    if (!bvhNodes.empty()) {
+    if (!allBvhNodes.empty()) {
         VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
-                                       bvhNodes, m_bvhNodeBuffer, m_bvhNodeBufferMemory);
+                                       allBvhNodes, m_bvhNodeBuffer, m_bvhNodeBufferMemory);
         VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
-                                       bvhTriIndices, m_bvhTriIdxBuffer, m_bvhTriIdxBufferMemory);
+                                       allBvhTriIndices, m_bvhTriIdxBuffer, m_bvhTriIdxBufferMemory);
     }
 
+    // Create mesh info buffer
+    VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
+                                   meshInfos, m_meshInfoBuffer, m_meshInfoBufferMemory);
+
+    // Upload materials buffer
+    VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
+                                   allMaterials, m_materialBuffer, m_materialBufferMemory);
+
+    // Load and concatenate all textures
+    std::vector<float> allTextureData;
+    std::vector<Scene::GPUTextureInfo> textureInfos;
+    uint32_t textureOffset = 0;
+
+    for (size_t i = 0; i < texturePaths.size(); ++i) {
+        const auto& texPath = texturePaths[i];
+        int texWidth, texHeight, texChannels;
+        stbi_uc* pixels = stbi_load(texPath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+
+        Scene::GPUTextureInfo texInfo{};
+        texInfo.offset = textureOffset;
+
+        if (pixels) {
+            texInfo.width = static_cast<uint32_t>(texWidth);
+            texInfo.height = static_cast<uint32_t>(texHeight);
+
+            // Convert to vec4 floats and append
+            for (int i = 0; i < texWidth * texHeight; ++i) {
+                allTextureData.push_back(pixels[i * 4 + 0] / 255.0f);  // R
+                allTextureData.push_back(pixels[i * 4 + 1] / 255.0f);  // G
+                allTextureData.push_back(pixels[i * 4 + 2] / 255.0f);  // B
+                allTextureData.push_back(pixels[i * 4 + 3] / 255.0f);  // A
+            }
+            stbi_image_free(pixels);
+
+            textureOffset += static_cast<uint32_t>(texWidth * texHeight);
+        } else {
+            std::cerr << "Warning: Failed to load texture: " << texPath << "\n";
+            // Add a single white pixel as fallback
+            texInfo.width = 1;
+            texInfo.height = 1;
+            allTextureData.push_back(1.0f);
+            allTextureData.push_back(1.0f);
+            allTextureData.push_back(1.0f);
+            allTextureData.push_back(1.0f);
+            textureOffset += 1;
+        }
+
+        textureInfos.push_back(texInfo);
+    }
+
+    // Ensure we have at least a dummy texture
+    if (textureInfos.empty()) {
+        Scene::GPUTextureInfo dummyInfo{};
+        dummyInfo.offset = 0;
+        dummyInfo.width = 1;
+        dummyInfo.height = 1;
+        textureInfos.push_back(dummyInfo);
+        allTextureData = {1.0f, 1.0f, 1.0f, 1.0f};  // Single white pixel
+    }
+
+    // Upload texture data and info buffers
+    VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
+                                   allTextureData, m_textureBuffer, m_textureBufferMemory);
+    VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
+                                   textureInfos, m_textureInfoBuffer, m_textureInfoBufferMemory);
+
+    // Store first texture dimensions for backwards compatibility with push constants
+    m_textureWidth = textureInfos[0].width;
+    m_textureHeight = textureInfos[0].height;
+
+    // Track material count for shader to use correct bounds
+    m_uploadedMaterialCount = static_cast<uint32_t>(allMaterials.size());
     m_meshesUploaded = true;
 }
 
@@ -782,26 +979,29 @@ void VulkanRenderer::UploadSceneData(const Scene::SceneData& sceneData) {
     VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
                                    sceneData.lights, m_lightBuffer, m_lightBufferMemory);
 
-    // Create material buffer from scene data
-    std::vector<Scene::GPUMaterial> gpuMaterials;
-    if (!sceneData.materials.empty()) {
-        gpuMaterials = sceneData.materials;
-    } else {
-        // Create default material if none provided (optimized 32-byte layout)
-        Scene::GPUMaterial defaultMat{};
-        defaultMat.diffuse[0] = 0.8f;
-        defaultMat.diffuse[1] = 0.8f;
-        defaultMat.diffuse[2] = 0.8f;
-        defaultMat.shininess = 32.0f;
-        defaultMat.shadingMode = static_cast<int32_t>(Scene::ShadingMode::PBR);
-        defaultMat.diffuseTextureIndex = -1;
-        defaultMat.metalness = 0.0f;
-        defaultMat.roughness = 0.5f;
-        gpuMaterials.push_back(defaultMat);
-    }
+    // Only create material buffer if not already uploaded by UploadMeshes
+    // (UploadMeshes handles mesh materials with proper texture indices)
+    if (m_materialBuffer == VK_NULL_HANDLE) {
+        std::vector<Scene::GPUMaterial> gpuMaterials;
+        if (!sceneData.materials.empty()) {
+            gpuMaterials = sceneData.materials;
+        } else {
+            // Create default material if none provided (optimized 32-byte layout)
+            Scene::GPUMaterial defaultMat{};
+            defaultMat.diffuse[0] = 0.8f;
+            defaultMat.diffuse[1] = 0.8f;
+            defaultMat.diffuse[2] = 0.8f;
+            defaultMat.shininess = 32.0f;
+            defaultMat.shadingMode = static_cast<int32_t>(Scene::ShadingMode::PBR);
+            defaultMat.diffuseTextureIndex = -1;
+            defaultMat.metalness = 0.0f;
+            defaultMat.roughness = 0.5f;
+            gpuMaterials.push_back(defaultMat);
+        }
 
-    VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
-                                   gpuMaterials, m_materialBuffer, m_materialBufferMemory);
+        VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
+                                       gpuMaterials, m_materialBuffer, m_materialBufferMemory);
+    }
 
     // Create minimal instance buffer for descriptor set binding
     // The actual instance data will be uploaded separately via uploadInstances()
@@ -809,11 +1009,30 @@ void VulkanRenderer::UploadSceneData(const Scene::SceneData& sceneData) {
     defaultInstances.push_back(Scene::GPUMeshInstance::identity(0));  // Single identity instance
     VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
                                    defaultInstances, m_instanceMotorBuffer, m_instanceMotorBufferMemory);
+    m_instanceBufferCapacity = 1;
 }
 
 void VulkanRenderer::UploadInstances(const std::vector<MeshInstance>& instances) {
     if (instances.empty()) {
         return;  // Keep default identity instance
+    }
+
+    const auto instanceCount = static_cast<uint32_t>(instances.size());
+
+    // Check if we need to reallocate the buffer (instance count exceeds capacity)
+    if (instanceCount > m_instanceBufferCapacity) {
+        // Wait for GPU to finish using the old buffer
+        vkDeviceWaitIdle(m_device);
+
+        // Free old buffer
+        if (m_instanceMotorBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(m_device, m_instanceMotorBuffer, nullptr);
+            m_instanceMotorBuffer = VK_NULL_HANDLE;
+        }
+        if (m_instanceMotorBufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(m_device, m_instanceMotorBufferMemory, nullptr);
+            m_instanceMotorBufferMemory = VK_NULL_HANDLE;
+        }
     }
 
     std::vector<Scene::GPUMeshInstance> gpuInstances;
@@ -932,8 +1151,32 @@ void VulkanRenderer::UploadInstances(const std::vector<MeshInstance>& instances)
         VulkanHelpers::updateBufferData(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
                                         gpuInstances, m_instanceMotorBuffer);
     } else {
+        // Buffer was reallocated - create new buffer and update descriptor set
         VulkanHelpers::uploadToBuffer(m_device, m_physicalDevice, m_commandPool, m_computeQueue,
                                        gpuInstances, m_instanceMotorBuffer, m_instanceMotorBufferMemory);
+
+        // Track the new buffer capacity
+        m_instanceBufferCapacity = instanceCount;
+
+        // Update descriptor set to point to new buffer (binding 10)
+        // Only if descriptor set already exists (not during initial setup)
+        if (m_descriptorSet != VK_NULL_HANDLE) {
+            VkDescriptorBufferInfo instanceMotorBufferInfo{};
+            instanceMotorBufferInfo.buffer = m_instanceMotorBuffer;
+            instanceMotorBufferInfo.offset = 0;
+            instanceMotorBufferInfo.range = VK_WHOLE_SIZE;
+
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = m_descriptorSet;
+            descriptorWrite.dstBinding = 10;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &instanceMotorBufferInfo;
+
+            vkUpdateDescriptorSets(m_device, 1, &descriptorWrite, 0, nullptr);
+        }
     }
 
 }
@@ -1086,7 +1329,18 @@ void VulkanRenderer::selectPhysicalDevice() {
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(m_instance, &deviceCount, devices.data());
 
-    // Find a suitable device
+    // Candidate device info
+    struct DeviceCandidate {
+        VkPhysicalDevice device;
+        uint32_t computeQueueFamily;
+        uint32_t graphicsQueueFamily;
+        uint32_t presentQueueFamily;
+        int score;
+    };
+
+    std::vector<DeviceCandidate> candidates;
+
+    // Score each device
     for (const auto& device : devices) {
         uint32_t queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
@@ -1098,46 +1352,86 @@ void VulkanRenderer::selectPhysicalDevice() {
         bool foundCompute = false;
         bool foundGraphics = false;
         bool foundPresent = false;
+        uint32_t computeFamily = 0, graphicsFamily = 0, presentFamily = 0;
 
         for (uint32_t i = 0; i < queueFamilyCount; ++i) {
-            // Compute queue
             if (!foundCompute && (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
-                m_computeQueueFamily = i;
+                computeFamily = i;
                 foundCompute = true;
             }
-
-            // Graphics queue
             if (!foundGraphics && (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-                m_graphicsQueueFamily = i;
+                graphicsFamily = i;
                 foundGraphics = true;
             }
-
-            // Present queue
             VkBool32 presentSupport = false;
             vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface, &presentSupport);
             if (!foundPresent && presentSupport) {
-                m_presentQueueFamily = i;
+                presentFamily = i;
                 foundPresent = true;
             }
-
             if (foundCompute && foundGraphics && foundPresent) {
                 break;
             }
         }
 
-        if (foundCompute && foundGraphics && foundPresent) {
-            m_physicalDevice = device;
-
-            VkPhysicalDeviceProperties properties;
-            vkGetPhysicalDeviceProperties(device, &properties);
-            std::cout << "Selected GPU: " << properties.deviceName << '\n';
-            break;
+        if (!foundCompute || !foundGraphics || !foundPresent) {
+            continue;  // Skip unsuitable devices
         }
+
+        // Score based on device type (prefer discrete GPUs)
+        VkPhysicalDeviceProperties properties;
+        vkGetPhysicalDeviceProperties(device, &properties);
+
+        int score = 0;
+        switch (properties.deviceType) {
+            case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                score = 1000;  // Strongly prefer dedicated graphics cards
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                score = 100;   // Integrated GPUs as fallback
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                score = 50;    // Virtual GPUs (VMs)
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_CPU:
+                score = 10;    // Software rasterization
+                break;
+            default:
+                score = 1;
+                break;
+        }
+
+        candidates.push_back({device, computeFamily, graphicsFamily, presentFamily, score});
     }
 
-    if (m_physicalDevice == VK_NULL_HANDLE) {
+    if (candidates.empty()) {
         throw std::runtime_error("Failed to find suitable GPU");
     }
+
+    // Select the device with the highest score
+    auto best = std::max_element(candidates.begin(), candidates.end(),
+        [](const DeviceCandidate& a, const DeviceCandidate& b) {
+            return a.score < b.score;
+        });
+
+    m_physicalDevice = best->device;
+    m_computeQueueFamily = best->computeQueueFamily;
+    m_graphicsQueueFamily = best->graphicsQueueFamily;
+    m_presentQueueFamily = best->presentQueueFamily;
+
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(m_physicalDevice, &properties);
+
+    const char* deviceTypeStr = "Unknown";
+    switch (properties.deviceType) {
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: deviceTypeStr = "Discrete GPU"; break;
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: deviceTypeStr = "Integrated GPU"; break;
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: deviceTypeStr = "Virtual GPU"; break;
+        case VK_PHYSICAL_DEVICE_TYPE_CPU: deviceTypeStr = "CPU"; break;
+        default: break;
+    }
+
+    std::cout << "Selected GPU: " << properties.deviceName << " (" << deviceTypeStr << ")\n";
 }
 
 void VulkanRenderer::createDevice() {
@@ -1441,7 +1735,7 @@ void VulkanRenderer::createStorageImage() {
 }
 
 void VulkanRenderer::createDescriptorSetLayout() {
-    // 11 bindings: storage image, vertex, index, spheres, planes, lights, materials, bvhNodes, bvhTriIdx, texture, instanceMotors
+    // 13 bindings: storage image, vertex, index, spheres, planes, lights, materials, bvhNodes, bvhTriIdx, texture, instanceMotors, meshInfos, textureInfos
     std::vector<VulkanHelpers::DescriptorBinding> bindings = {
         {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
         {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},  // Vertices
@@ -1454,6 +1748,8 @@ void VulkanRenderer::createDescriptorSetLayout() {
         {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},  // BVH tri indices
         {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT},  // Texture data
         {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT}, // Instance motors
+        {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT}, // Mesh infos
+        {12, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT}, // Texture infos
     };
 
     m_descriptorSetLayout = VulkanHelpers::createDescriptorSetLayout(m_device, bindings);
@@ -1465,7 +1761,7 @@ void VulkanRenderer::createDescriptorPool() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     poolSizes[0].descriptorCount = 1;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[1].descriptorCount = 10;  // vertex, index, spheres, planes, lights, materials, bvhNodes, bvhTriIdx, texture, instanceMotors
+    poolSizes[1].descriptorCount = 12;  // vertex, index, spheres, planes, lights, materials, bvhNodes, bvhTriIdx, texture, instanceMotors, meshInfos, textureInfos
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1491,8 +1787,8 @@ void VulkanRenderer::CreateDescriptorSet() {
         throw std::runtime_error("Failed to allocate descriptor set");
     }
 
-    // Update all 11 descriptors
-    std::array<VkWriteDescriptorSet, 11> descriptorWrites{};
+    // Update all 13 descriptors
+    std::array<VkWriteDescriptorSet, 13> descriptorWrites{};
 
     // Storage image (binding 0)
     VkDescriptorImageInfo imageInfo{};
@@ -1646,6 +1942,34 @@ void VulkanRenderer::CreateDescriptorSet() {
     descriptorWrites[10].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptorWrites[10].descriptorCount = 1;
     descriptorWrites[10].pBufferInfo = &instanceMotorBufferInfo;
+
+    // Mesh info buffer (binding 11)
+    VkDescriptorBufferInfo meshInfoBufferInfo{};
+    meshInfoBufferInfo.buffer = m_meshInfoBuffer != VK_NULL_HANDLE ? m_meshInfoBuffer : m_vertexBuffer; // Use dummy buffer if not created
+    meshInfoBufferInfo.offset = 0;
+    meshInfoBufferInfo.range = VK_WHOLE_SIZE;
+
+    descriptorWrites[11].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[11].dstSet = m_descriptorSet;
+    descriptorWrites[11].dstBinding = 11;
+    descriptorWrites[11].dstArrayElement = 0;
+    descriptorWrites[11].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrites[11].descriptorCount = 1;
+    descriptorWrites[11].pBufferInfo = &meshInfoBufferInfo;
+
+    // Texture info buffer (binding 12)
+    VkDescriptorBufferInfo textureInfoBufferInfo{};
+    textureInfoBufferInfo.buffer = m_textureInfoBuffer != VK_NULL_HANDLE ? m_textureInfoBuffer : m_vertexBuffer; // Use dummy buffer if not created
+    textureInfoBufferInfo.offset = 0;
+    textureInfoBufferInfo.range = VK_WHOLE_SIZE;
+
+    descriptorWrites[12].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[12].dstSet = m_descriptorSet;
+    descriptorWrites[12].dstBinding = 12;
+    descriptorWrites[12].dstArrayElement = 0;
+    descriptorWrites[12].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrites[12].descriptorCount = 1;
+    descriptorWrites[12].pBufferInfo = &textureInfoBufferInfo;
 
     vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(descriptorWrites.size()),
                           descriptorWrites.data(), 0, nullptr);
@@ -1918,6 +2242,14 @@ void VulkanRenderer::cleanup() {
             vkFreeMemory(m_device, m_bvhTriIdxBufferMemory, nullptr);
             m_bvhTriIdxBufferMemory = VK_NULL_HANDLE;
         }
+        if (m_meshInfoBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(m_device, m_meshInfoBuffer, nullptr);
+            m_meshInfoBuffer = VK_NULL_HANDLE;
+        }
+        if (m_meshInfoBufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(m_device, m_meshInfoBufferMemory, nullptr);
+            m_meshInfoBufferMemory = VK_NULL_HANDLE;
+        }
         if (m_sphereBuffer != VK_NULL_HANDLE) {
             vkDestroyBuffer(m_device, m_sphereBuffer, nullptr);
             m_sphereBuffer = VK_NULL_HANDLE;
@@ -1957,6 +2289,14 @@ void VulkanRenderer::cleanup() {
         if (m_textureBufferMemory != VK_NULL_HANDLE) {
             vkFreeMemory(m_device, m_textureBufferMemory, nullptr);
             m_textureBufferMemory = VK_NULL_HANDLE;
+        }
+        if (m_textureInfoBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(m_device, m_textureInfoBuffer, nullptr);
+            m_textureInfoBuffer = VK_NULL_HANDLE;
+        }
+        if (m_textureInfoBufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(m_device, m_textureInfoBufferMemory, nullptr);
+            m_textureInfoBufferMemory = VK_NULL_HANDLE;
         }
         if (m_instanceMotorBuffer != VK_NULL_HANDLE) {
             vkDestroyBuffer(m_device, m_instanceMotorBuffer, nullptr);

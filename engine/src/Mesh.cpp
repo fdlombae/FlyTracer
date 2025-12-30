@@ -351,6 +351,64 @@ void Mesh::ComputeNormals() {
     }
 }
 
+bool Mesh::HasUVCoordinates() const noexcept {
+    // Check if any vertex has non-zero UV coordinates
+    for (const auto& v : m_vertices) {
+        if (v.texCoord[0] != 0.0f || v.texCoord[1] != 0.0f) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Mesh::GenerateCylindricalUVs() {
+    if (m_vertices.empty()) return;
+
+    // Find bounding box for normalization
+    float minX = m_vertices[0].position.e032(), maxX = minX;
+    float minY = m_vertices[0].position.e013(), maxY = minY;
+    float minZ = m_vertices[0].position.e021(), maxZ = minZ;
+
+    for (const auto& v : m_vertices) {
+        float x = v.position.e032();
+        float y = v.position.e013();
+        float z = v.position.e021();
+        minX = std::min(minX, x); maxX = std::max(maxX, x);
+        minY = std::min(minY, y); maxY = std::max(maxY, y);
+        minZ = std::min(minZ, z); maxZ = std::max(maxZ, z);
+    }
+
+    // Center for cylindrical projection
+    float centerX = (minX + maxX) * 0.5f;
+    float centerZ = (minZ + maxZ) * 0.5f;
+    float height = maxY - minY;
+
+    // Avoid division by zero
+    if (height < 0.0001f) height = 1.0f;
+
+    constexpr float PI = 3.14159265358979323846f;
+    constexpr float TWO_PI = 2.0f * PI;
+
+    // Generate cylindrical UVs
+    // U = angle around Y axis (0 to 1)
+    // V = height along Y axis (0 to 1)
+    for (auto& v : m_vertices) {
+        float x = v.position.e032() - centerX;
+        float y = v.position.e013();
+        float z = v.position.e021() - centerZ;
+
+        // U coordinate: angle around the Y axis
+        float angle = std::atan2(x, z);  // Range: -PI to PI
+        float u = (angle / TWO_PI) + 0.5f;  // Range: 0 to 1
+
+        // V coordinate: normalized height
+        float vCoord = (y - minY) / height;
+
+        v.texCoord[0] = u;
+        v.texCoord[1] = vCoord;
+    }
+}
+
 void Mesh::Scale(float factor) {
     for (auto& v : m_vertices) {
         // Scale position (TriVector: e032=x, e013=y, e021=z)

@@ -160,6 +160,8 @@ private:
     VkDeviceMemory m_bvhNodeBufferMemory{VK_NULL_HANDLE};
     VkBuffer m_bvhTriIdxBuffer{VK_NULL_HANDLE};
     VkDeviceMemory m_bvhTriIdxBufferMemory{VK_NULL_HANDLE};
+    VkBuffer m_meshInfoBuffer{VK_NULL_HANDLE};
+    VkDeviceMemory m_meshInfoBufferMemory{VK_NULL_HANDLE};
     VkBuffer m_sphereBuffer{VK_NULL_HANDLE};
     VkDeviceMemory m_sphereBufferMemory{VK_NULL_HANDLE};
     VkBuffer m_planeBuffer{VK_NULL_HANDLE};
@@ -170,10 +172,13 @@ private:
     VkDeviceMemory m_materialBufferMemory{VK_NULL_HANDLE};
     VkBuffer m_textureBuffer{VK_NULL_HANDLE};
     VkDeviceMemory m_textureBufferMemory{VK_NULL_HANDLE};
+    VkBuffer m_textureInfoBuffer{VK_NULL_HANDLE};
+    VkDeviceMemory m_textureInfoBufferMemory{VK_NULL_HANDLE};
     uint32_t m_textureWidth{0};
     uint32_t m_textureHeight{0};
     VkBuffer m_instanceMotorBuffer{VK_NULL_HANDLE};
     VkDeviceMemory m_instanceMotorBufferMemory{VK_NULL_HANDLE};
+    uint32_t m_instanceBufferCapacity{0};  // Track allocated capacity for dynamic resize
 
     // Storage image layout tracking
     VkImageLayout m_storageImageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
@@ -199,6 +204,7 @@ private:
     uint32_t m_imageIndex{0};
     bool m_frameStarted{false};
     bool m_meshesUploaded{false};
+    uint32_t m_uploadedMaterialCount{0};  // Material count from UploadMeshes
 
     // Modern Vulkan 1.3 extension function pointers (loaded dynamically for MoltenVK compatibility)
     PFN_vkQueueSubmit2KHR m_vkQueueSubmit2KHR{nullptr};

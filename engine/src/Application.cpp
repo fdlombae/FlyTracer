@@ -46,19 +46,12 @@ Application::Application(int width, int height, const std::string& title,
     m_cameraTarget = m_gameScene->GetCameraTarget();
     m_cameraUp = m_gameScene->GetCameraUp();
 
-    // Upload meshes, scene data, instances to GPU
+    // Upload meshes (includes materials and textures), scene data, instances to GPU
     uploadMeshes(m_gameScene->GetMeshes());
     m_renderer->UploadSceneData(m_sceneData);
     m_renderer->UploadInstances(m_meshInstances);
 
-    // Upload texture from scene (if specified)
-    const std::string& texturePath = m_gameScene->GetTextureFilename();
-    if (!texturePath.empty()) {
-        m_renderer->UploadTexture(texturePath);
-    } else {
-        // Upload dummy texture
-        m_renderer->UploadTexture("");
-    }
+    // Note: Textures are now uploaded by UploadMeshes from mesh materials
 
     // Create descriptor set and compute pipeline
     m_renderer->CreateDescriptorSet();

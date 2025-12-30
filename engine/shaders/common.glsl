@@ -124,6 +124,25 @@ struct MeshInstance {
     vec2 _pad;
 };
 
+// Texture info - per-texture metadata for multi-texture support (16 bytes)
+struct TextureInfo {
+    uint offset;            // Offset into texture data buffer (in vec4 pixels)
+    uint width;             // Texture width
+    uint height;            // Texture height
+    uint _pad;              // Padding to 16 bytes
+};
+
+// Mesh info - per-mesh offsets for multi-mesh support (32 bytes)
+struct MeshInfo {
+    uint vertexOffset;      // Offset into vertex buffer
+    uint triangleOffset;    // Offset into triangle buffer
+    uint bvhNodeOffset;     // Offset into BVH node buffer
+    uint bvhTriIdxOffset;   // Offset into BVH triangle index buffer
+    uint triangleCount;     // Number of triangles in this mesh
+    uint bvhNodeCount;      // Number of BVH nodes in this mesh
+    uvec2 _pad;             // Padding to 32 bytes
+};
+
 // Hit information
 struct HitInfo {
     bool hit;
