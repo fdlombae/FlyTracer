@@ -28,7 +28,7 @@ void DebugDemoScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
                   Scene::Color(1.0f, 1.0f, 1.0f), 1.5f, 50.0f);
 
     // Camera
-    m_cameraEye = TriVector(15.0f, 10.0f, 15.0f);
+    m_cameraOrigin = TriVector(15.0f, 10.0f, 15.0f);
     m_cameraTarget = TriVector(0.0f, 3.0f, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
@@ -124,7 +124,7 @@ void DebugDemoScene::OnInput(const InputState& input) {
     const float camY = std::sin(m_cameraPitch) * m_cameraDistance + targetY;
     const float camZ = std::cos(m_cameraYaw) * std::cos(m_cameraPitch) * m_cameraDistance;
 
-    m_cameraEye = TriVector(camX, camY, camZ);
+    m_cameraOrigin = TriVector(camX, camY, camZ);
     m_cameraTarget = TriVector(0.0f, targetY, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 

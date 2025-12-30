@@ -345,9 +345,9 @@ void GameScene::ClearDebugDraw() {
 
 bool GameScene::ProjectToScreen(const TriVector& worldPos, float& screenX, float& screenY) const {
     // Get camera vectors
-    const float eyeX = m_cameraEye.e032();
-    const float eyeY = m_cameraEye.e013();
-    const float eyeZ = m_cameraEye.e021();
+    const float eyeX = m_cameraOrigin.e032();
+    const float eyeY = m_cameraOrigin.e013();
+    const float eyeZ = m_cameraOrigin.e021();
 
     const float targetX = m_cameraTarget.e032();
     const float targetY = m_cameraTarget.e013();

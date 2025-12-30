@@ -46,7 +46,7 @@ void TestBoxScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
                   Scene::Color(1.0f, 1.0f, 1.0f), 2.0f, 100.0f);
 
     // Camera
-    m_cameraEye = TriVector(0.0f, 15.0f, 60.0f);
+    m_cameraOrigin = TriVector(0.0f, 15.0f, 60.0f);
     m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f, 0.0f);
 }
@@ -93,7 +93,7 @@ void TestBoxScene::OnInput(const InputState& input) {
     const float camY = std::sin(m_cameraPitch) * m_cameraDistance + targetY;
     const float camZ = std::cos(m_cameraYaw) * std::cos(m_cameraPitch) * m_cameraDistance;
 
-    m_cameraEye = TriVector(camX, camY, camZ);
+    m_cameraOrigin = TriVector(camX, camY, camZ);
     m_cameraTarget = TriVector(0.0f, targetY, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
