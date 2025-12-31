@@ -33,8 +33,8 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
 
     // Capsule
     m_characterMeshId = LoadMesh("capsule.obj", "");
-    AddMeshInstance(m_characterMeshId, TriVector(0.f, 0.f, 0.f), "capsule");
-    m_pCharacterMesh = FindInstance("capsule");
+    AddMeshInstance(m_characterMeshId, TriVector(0.f, 0.f, 0.f), "character");
+    m_pCharacterMesh = FindInstance("character");
     m_pCharacterMesh ->scale = 5.f;
 
     // Point light
@@ -42,10 +42,9 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
                   Scene::Color(1.0f, 1.0f, 1.0f), 2.0f, 100.0f);
 
     // Camera
-    m_cameraOrigin = TriVector(0.0f, 15.0f, 60.0f);
+    m_cameraOrigin = TriVector(0.0f, 10.0f, 60.0f);
     m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f, 0.0f);
-
 }
 
 void MainScene::OnUpdate(float const deltaSec) {
@@ -79,16 +78,19 @@ void MainScene::ProcessCameraMovement(InputState const &input) {
 
 void MainScene::ProcessMovement(float const deltaSec) {
     bool const* const pKeyboardState{ SDL_GetKeyboardState(nullptr) };
-    BiVector direction{};// e23 - x, e31 - y, e12 - z. LHS, Y up
-    if (pKeyboardState[SDL_SCANCODE_W]) direction.e31() += 1;
-    if (pKeyboardState[SDL_SCANCODE_S]) direction.e31() -= 1;
-    if (pKeyboardState[SDL_SCANCODE_A]) direction.e23() += 1;
-    if (pKeyboardState[SDL_SCANCODE_D]) direction.e23() -= 1;
-    if (direction.Norm() == 0) return;
-    direction.Normalize();
-    Motor T = Motor::Translation(m_movementSpeed * deltaSec, direction);
-    // Updating character position
+    BiVector direction{};// e01 - x, e02 - y, e03 - z. LHS, Y up
+    if (pKeyboardState[SDL_SCANCODE_W]) direction.e03() += 1;
+    if (pKeyboardState[SDL_SCANCODE_S]) direction.e03() -= 1;
+    if (pKeyboardState[SDL_SCANCODE_A]) direction.e01() += 1;
+    if (pKeyboardState[SDL_SCANCODE_D]) direction.e01() -= 1;
+    if (direction.VNorm() == 0) return;// Not moving if no key is pressed
+    direction /= direction.VNorm();// Normalizing vanishing part to prevent speed increase when moving diagonally
+    float const speed{ m_movementSpeed * deltaSec };
+    Motor const T{speed, direction.e01(), 0.f, direction.e03(), 0.f, 0.f, 0.f, 0.f};
     m_pCharacterMesh->transform = T * m_pCharacterMesh->transform;
+    // How
+    //m_cameraOrigin = ((speed * T) * m_cameraOrigin * ~(speed * T)).Grade3();
+    
 }
 
 void MainScene::ResolveCameraCollisions() {

@@ -1,8 +1,6 @@
 #pragma once
 
 #include "GameScene.h"
-#include <cstdint>
-#include <numbers>
 
 class MainScene final : public GameScene {
 public:
@@ -24,7 +22,7 @@ private:
 
     uint32_t m_characterMeshId{};
     MeshInstance* m_pCharacterMesh{};
-    float m_movementSpeed{ 6.f }; // units/s
+    float m_movementSpeed{ 60.f }; // units/s
 
     void ProcessCameraMovement(InputState const& input);
     void ProcessMovement(float deltaSec);
