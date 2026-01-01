@@ -53,7 +53,7 @@ void MainScene::OnUpdate(float const deltaSec) {
 }
 
 void MainScene::OnInput(const InputState& input) {
-    ProcessCameraMovement(input);
+    //ProcessCameraMovement(input);
     ResolveCameraCollisions();
 }
 
@@ -86,11 +86,11 @@ void MainScene::ProcessMovement(float const deltaSec) {
     if (direction.VNorm() == 0) return;// Not moving if no key is pressed
     direction /= direction.VNorm();// Normalizing vanishing part to prevent speed increase when moving diagonally
     float const speed{ m_movementSpeed * deltaSec };
-    Motor const T{speed, direction.e01(), 0.f, direction.e03(), 0.f, 0.f, 0.f, 0.f};
-    m_pCharacterMesh->transform = T * m_pCharacterMesh->transform;
-    // How
-    //m_cameraOrigin = ((speed * T) * m_cameraOrigin * ~(speed * T)).Grade3();
-    
+    Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
+    m_pCharacterMesh->transform = ~T * m_pCharacterMesh->transform;
+    m_cameraOrigin = ((speed * T) * m_cameraOrigin * ~(speed * T)).Grade3();
+    m_cameraTarget = ((speed * T) * m_cameraTarget * ~(speed * T)).Grade3();
+
 }
 
 void MainScene::ResolveCameraCollisions() {
