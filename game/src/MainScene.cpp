@@ -53,7 +53,7 @@ void MainScene::OnUpdate(float const deltaSec) {
 }
 
 void MainScene::OnInput(const InputState& input) {
-    //ProcessCameraMovement(input);
+    ProcessCameraMovement(input);
     ResolveCameraCollisions();
 }
 
@@ -71,8 +71,8 @@ void MainScene::ProcessCameraMovement(InputState const &input) {
     const float camY = std::sin(m_cameraPitch) * m_cameraDistance + targetY;
     const float camZ = std::cos(m_cameraYaw) * std::cos(m_cameraPitch) * m_cameraDistance;
 
-    m_cameraOrigin = TriVector(camX, camY, camZ);
-    m_cameraTarget = TriVector(0.0f, targetY, 0.0f);
+    m_cameraOrigin = (~m_pCharacterMesh->transform * TriVector(camX, camY, camZ) * m_pCharacterMesh->transform).Grade3();
+    m_cameraTarget = (~m_pCharacterMesh->transform * TriVector(0.0f, targetY, 0.0f) * m_pCharacterMesh->transform).Grade3();
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
 
@@ -86,11 +86,9 @@ void MainScene::ProcessMovement(float const deltaSec) {
     if (direction.VNorm() == 0) return;// Not moving if no key is pressed
     direction /= direction.VNorm();// Normalizing vanishing part to prevent speed increase when moving diagonally
     float const speed{ m_movementSpeed * deltaSec };
+    // NOTE: Dividing by 2, because bireflection doubles the distance
     Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
     m_pCharacterMesh->transform = ~T * m_pCharacterMesh->transform;
-    m_cameraOrigin = ((speed * T) * m_cameraOrigin * ~(speed * T)).Grade3();
-    m_cameraTarget = ((speed * T) * m_cameraTarget * ~(speed * T)).Grade3();
-
 }
 
 void MainScene::ResolveCameraCollisions() {

@@ -15,7 +15,7 @@ public:
 private:
     // Camera orbit
     float m_cameraYaw{0.0f};
-    float m_cameraPitch{0.1f};
+    float m_cameraPitch{0.5f};
     float m_cameraDistance{50.0f};
     float m_mouseSensitivity{0.005f};
     float m_cameraColliderRadius{ 2.f };
