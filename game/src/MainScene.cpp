@@ -21,7 +21,7 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
 
     // Top plane
     AddPlane(Vector(height, 0.0f, -1.0f, 0.0f),
-             Scene::Material::Lambert(Scene::Color(0.8f, 0.8f, 0.9f)));
+             Scene::Material::Lambert(Scene::Color(0.f, 0.8f, 0.f)));
 
     // Left plane
     AddPlane(Vector(halfWidth, 1.0f, 0.0f, 0.0f),
@@ -70,10 +70,10 @@ void MainScene::OnInput(const InputState& input) {
 void MainScene::ProcessCameraMovement(InputState const &input) {
     m_cameraYaw -= input.mouseDeltaX * m_mouseSensitivity;
     m_cameraPitch += input.mouseDeltaY * m_mouseSensitivity;
-    m_cameraPitch = std::clamp(m_cameraPitch, -1.4f, 1.4f);
+    //m_cameraPitch = std::clamp(m_cameraPitch, -1.4f, 1.4f);
 
     m_cameraDistance -= input.scrollDelta * 2.0f;
-    m_cameraDistance = std::clamp(m_cameraDistance, 10.0f, 150.0f);
+    //m_cameraDistance = std::clamp(m_cameraDistance, 10.0f, 150.0f);
 
     constexpr float targetY = 15.0f;
 
@@ -83,6 +83,7 @@ void MainScene::ProcessCameraMovement(InputState const &input) {
 
     m_cameraOrigin = (~m_characterTranslation * TriVector(camX, camY, camZ) * m_characterTranslation).Grade3().Normalized();
     m_cameraTarget = (~m_characterTranslation * TriVector(0.0f, targetY, 0.0f) * m_characterTranslation).Grade3().Normalized();
+    std::cout << m_cameraYaw * 1 / DEG_TO_RAD << std::endl;
 }
 
 void MainScene::ProcessCharacterMovement(float const deltaSec) {
@@ -127,9 +128,12 @@ bool MainScene::ResolveCharacterCollisions()
 {
     bool hasCollision{};
     // 1. Getting the top and bottom spheres(origins)
-    TriVector const characterOrigin{ (m_characterTranslation * TriVector{0.f, 0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized() };
-    TriVector const topOrigin{ (characterOrigin/* + m_characterUp * (m_characterColliderHeight - m_characterColliderRadius)*/).Normalized() },
-        bottomOrigin{ (characterOrigin/* + m_characterUp * m_characterColliderRadius*/).Normalized() };
+    TriVector const characterOrigin{ (m_characterTranslation * TriVector{0.f,  0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized() };
+    TriVector topOrigin{ characterOrigin };
+    topOrigin.e013() = m_characterColliderHeight - m_characterColliderRadius;
+    TriVector bottomOrigin{ characterOrigin };
+    bottomOrigin.e013() = m_characterColliderRadius;
+
     // 2. Iterating over planes
     for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes)
     {
@@ -140,7 +144,6 @@ bool MainScene::ResolveCharacterCollisions()
         float const smallestSignedDistance{
             std::abs(topDistance) < std::abs(bottomDistance) ? topDistance : bottomDistance
         };
-        std::cout << "Smallest distance = " << smallestSignedDistance << std::endl;
         // 3. Seeing if the distance of the closest one is smaller than the radius
         if (std::abs(smallestSignedDistance) < m_characterColliderRadius)
         {
