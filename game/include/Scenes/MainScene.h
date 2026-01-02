@@ -9,17 +9,15 @@ public:
     void OnInit(VulkanRenderer* renderer) override;
     void OnUpdate(float deltaSec) override;
     void OnInput(const InputState& input) override;
-    void OnGui() override;
-    void OnShutdown() override;
 
 private:
     // Camera orbit
-    float m_cameraYaw{0.f},
+    float m_cameraYaw{-0.75f},
         m_characterYaw{};// Set to camera's yaw when character is moved
     float m_cameraPitch{-.1f};
     float m_cameraDistance{50.0f};
     float m_mouseSensitivity{0.005f};
-    float m_cameraColliderRadius{ 2.f };
+    float m_cameraColliderRadius{ .01f }, m_characterColliderRadius{ 2.f };
     Motor m_characterTranslation{ 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 
     uint32_t m_characterMeshId{};
@@ -28,5 +26,7 @@ private:
 
     void ProcessCameraMovement(InputState const& input);
     void ProcessCharacterMovement(float deltaSec);
-    void ResolveCameraCollisions();
+    // Return if there were collisions
+    bool ResolveCameraCollisions();
+    bool ResolveCharacterCollisions();
 };

@@ -43,6 +43,7 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
                       Scene::Color(1.0f, 1.0f, 1.0f), 2.0f, 100.0f);
     }
 
+    // NOTE: Excessive since get overridden immediately by ProcessCameraMovement()
     // Camera
     //m_cameraOrigin = TriVector(0.0f, 10.0f, 40.0f);
     // m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
@@ -52,12 +53,18 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
 void MainScene::OnUpdate(float const deltaSec) {
     UpdateFPS(deltaSec);
     ProcessCharacterMovement(deltaSec);
-
+    ResolveCharacterCollisions();
 }
 
 void MainScene::OnInput(const InputState& input) {
+    float const oldCameraYaw{ m_cameraYaw }, oldCameraPitch{ m_cameraPitch };
     ProcessCameraMovement(input);
-    ResolveCameraCollisions();
+    if (ResolveCameraCollisions())// There was a collision
+    {
+        // Camera did not move, so rotation should not change
+        m_cameraYaw = oldCameraYaw;
+        m_cameraPitch = oldCameraPitch;
+    }
 }
 
 void MainScene::ProcessCameraMovement(InputState const &input) {
@@ -74,8 +81,8 @@ void MainScene::ProcessCameraMovement(InputState const &input) {
     const float camY = std::sin(m_cameraPitch) * m_cameraDistance + targetY;
     const float camZ = std::cos(m_cameraYaw) * std::cos(m_cameraPitch) * m_cameraDistance;
 
-    m_cameraOrigin = (~m_characterTranslation * TriVector(camX, camY, camZ) * m_characterTranslation).Grade3();
-    m_cameraTarget = (~m_characterTranslation * TriVector(0.0f, targetY, 0.0f) * m_characterTranslation).Grade3();
+    m_cameraOrigin = (~m_characterTranslation * TriVector(camX, camY, camZ) * m_characterTranslation).Grade3().Normalized();
+    m_cameraTarget = (~m_characterTranslation * TriVector(0.0f, targetY, 0.0f) * m_characterTranslation).Grade3().Normalized();
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
 
@@ -98,33 +105,42 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
     m_pCharacterMesh->transform = R * m_characterTranslation;
 }
 
-void MainScene::ResolveCameraCollisions() {
+bool MainScene::ResolveCameraCollisions() {
+    bool haveCollision{};
     // 1. Iterate over all the planes in the scene
-    for (Scene::GPUPlane const& plane : m_sceneData.planes) {
-        // 2. For each plane, get the distance to it
-        if (float const planeCameraDistance{ (m_cameraOrigin & plane.distance).Norm() };
-            planeCameraDistance < m_cameraColliderRadius)
+    for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes) {
+        // 2. For each plane, get the distance to it and check if distance is smaller than the collider's radius
+        if (float const planeCameraSignedDistance{ (gpuPlane.GetPlane() & m_cameraOrigin) };// NOTE: Both objects are already normalized
+            planeCameraSignedDistance < m_cameraColliderRadius)
         {
-            // 3. If distance is smaller than radius,
-            //    move the sphere in the opposite direction by distance - radius
-            // 3.1. Getting the opposite direction
-            TriVector planeToCameraDir{ m_cameraOrigin };
+            // 3. Move the camera along plane's normal by distance - radius
+            Vector vector{ gpuPlane.GetPlane() * (planeCameraSignedDistance - m_cameraColliderRadius) };
+            // NOTE: Vector's Euclidean coefficients are the components of its Euclidean normal
+            Motor const T{ 1.f, vector.e1(), vector.e2(), vector.e3(), 0.f, 0.f, 0.f, 0.f};
+            m_cameraOrigin = (T * m_cameraOrigin * ~T).Grade3();
+            haveCollision = true;
         }
     }
-
+    return haveCollision;
 }
 
-void MainScene::OnGui() {
-    return;
-    SDL_HideCursor();
-    ImGui::Begin("Main Scene");
-    ImGui::Text("FPS: %.1f", GetFPS());
-    ImGui::Text("Controls:");
-    ImGui::Text("WASD to move");
-    ImGui::Text("Move mouse to look around");
-    ImGui::End();
+bool MainScene::ResolveCharacterCollisions()
+{
+    return false;
+    // 1. Iterate over all the planes in the scene
+    for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes) {
+        // 2. For each plane, get the distance to it and check if distance is smaller than the collider's radius
+        TriVector const characterOrigin{ (m_characterTranslation * TriVector{0.f, 0.f, 0.f, 1.f} * ~m_characterTranslation).Grade3() };
+        Vector const plane{ gpuPlane.GetPlane() };
+        if (float const planeCharacterSignedDistance{ (gpuPlane.GetPlane() & characterOrigin) };// NOTE: Both objects are already normalized
+            planeCharacterSignedDistance < m_characterColliderRadius)
+        {
+            // 3. Move the character along plane's normal by distance - radius
+            Vector pgaPlane{ gpuPlane.GetPlane().Normalized() * (planeCharacterSignedDistance - m_characterColliderRadius) };
+            // NOTE: Vector's Euclidean coefficients are the components of its Euclidean normal
+            Motor const T{ 1.f, pgaPlane.e1(), pgaPlane.e2(), pgaPlane.e3(), 0.f, 0.f, 0.f, 0.f};
+            m_characterTranslation = T * m_characterTranslation;
+            std::cout << planeCharacterSignedDistance << std::endl;
+        }
+    }
 }
-
-void MainScene::OnShutdown() {}
-
-
