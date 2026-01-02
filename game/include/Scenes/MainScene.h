@@ -14,8 +14,8 @@ public:
 
 private:
     // Camera orbit
-    float m_cameraYaw{0.0f};
-    float m_cameraPitch{0.5f};
+    float m_cameraYaw{0.f};
+    float m_cameraPitch{-.1f};
     float m_cameraDistance{50.0f};
     float m_mouseSensitivity{0.005f};
     float m_cameraColliderRadius{ 2.f };
@@ -25,6 +25,6 @@ private:
     float m_movementSpeed{ 60.f }; // units/s
 
     void ProcessCameraMovement(InputState const& input);
-    void ProcessMovement(float deltaSec);
+    void ProcessCharacterMovement(float deltaSec);
     void ResolveCameraCollisions();
 };

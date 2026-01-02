@@ -44,14 +44,18 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
     }
 
     // Camera
-    m_cameraOrigin = TriVector(0.0f, 10.0f, 60.0f);
+    m_cameraOrigin = TriVector(0.0f, 10.0f, 40.0f);
     m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 void MainScene::OnUpdate(float const deltaSec) {
     UpdateFPS(deltaSec);
-    ProcessMovement(deltaSec);
+    ProcessCharacterMovement(deltaSec);
+
+    // Rotating the character
+    Motor const R{ Motor::Rotation(1, BiVector{0.f, 1.f, 0.f, 0.f, 0.f, 0.f}) };
+    m_pCharacterMesh->transform = R * m_pCharacterMesh->transform;
 }
 
 void MainScene::OnInput(const InputState& input) {
@@ -78,7 +82,7 @@ void MainScene::ProcessCameraMovement(InputState const &input) {
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
 
-void MainScene::ProcessMovement(float const deltaSec) {
+void MainScene::ProcessCharacterMovement(float const deltaSec) {
     bool const* const pKeyboardState{ SDL_GetKeyboardState(nullptr) };
     BiVector direction{};// e01 - x, e02 - y, e03 - z. LHS, Y up
     if (pKeyboardState[SDL_SCANCODE_W]) direction.e03() += 1;
@@ -90,7 +94,7 @@ void MainScene::ProcessMovement(float const deltaSec) {
     float const speed{ m_movementSpeed * deltaSec };
     // NOTE: Dividing by 2, because bireflection doubles the distance
     Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
-    m_pCharacterMesh->transform = T * m_pCharacterMesh->transform;
+
 }
 
 void MainScene::ResolveCameraCollisions() {
@@ -110,6 +114,7 @@ void MainScene::ResolveCameraCollisions() {
 }
 
 void MainScene::OnGui() {
+    return;
     SDL_HideCursor();
     ImGui::Begin("Main Scene");
     ImGui::Text("FPS: %.1f", GetFPS());
