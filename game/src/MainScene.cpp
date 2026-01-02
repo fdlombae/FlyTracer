@@ -44,18 +44,15 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
     }
 
     // Camera
-    m_cameraOrigin = TriVector(0.0f, 10.0f, 40.0f);
-    m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
-    m_cameraUp = TriVector(0.0f, 1.0f, 0.0f, 0.0f);
+    //m_cameraOrigin = TriVector(0.0f, 10.0f, 40.0f);
+    // m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
+    // m_cameraUp = TriVector(0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 void MainScene::OnUpdate(float const deltaSec) {
     UpdateFPS(deltaSec);
     ProcessCharacterMovement(deltaSec);
 
-    // Rotating the character
-    Motor const R{ Motor::Rotation(1, BiVector{0.f, 1.f, 0.f, 0.f, 0.f, 0.f}) };
-    m_pCharacterMesh->transform = R * m_pCharacterMesh->transform;
 }
 
 void MainScene::OnInput(const InputState& input) {
@@ -77,8 +74,8 @@ void MainScene::ProcessCameraMovement(InputState const &input) {
     const float camY = std::sin(m_cameraPitch) * m_cameraDistance + targetY;
     const float camZ = std::cos(m_cameraYaw) * std::cos(m_cameraPitch) * m_cameraDistance;
 
-    m_cameraOrigin = (~m_pCharacterMesh->transform * TriVector(camX, camY, camZ) * m_pCharacterMesh->transform).Grade3();
-    m_cameraTarget = (~m_pCharacterMesh->transform * TriVector(0.0f, targetY, 0.0f) * m_pCharacterMesh->transform).Grade3();
+    m_cameraOrigin = (~m_characterTranslation * TriVector(camX, camY, camZ) * m_characterTranslation).Grade3();
+    m_cameraTarget = (~m_characterTranslation * TriVector(0.0f, targetY, 0.0f) * m_characterTranslation).Grade3();
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
 
@@ -94,7 +91,10 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
     float const speed{ m_movementSpeed * deltaSec };
     // NOTE: Dividing by 2, because bireflection doubles the distance
     Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
+    m_characterTranslation = T * m_characterTranslation;
 
+    Motor const R{ Motor::Rotation(m_cameraYaw * 1 / DEG_TO_RAD + 180.f, BiVector{0.f, 0.f, 0.f, 0.f, 1.f, 0.f}) };
+    m_pCharacterMesh->transform = R * m_characterTranslation;
 }
 
 void MainScene::ResolveCameraCollisions() {

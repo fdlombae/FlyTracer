@@ -14,11 +14,12 @@ public:
 
 private:
     // Camera orbit
-    float m_cameraYaw{0.f};
+    float m_cameraYaw{0.f}, m_characterYaw{};
     float m_cameraPitch{-.1f};
     float m_cameraDistance{50.0f};
     float m_mouseSensitivity{0.005f};
     float m_cameraColliderRadius{ 2.f };
+    Motor m_characterTranslation{ 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 
     uint32_t m_characterMeshId{};
     MeshInstance* m_pCharacterMesh{};
