@@ -14,7 +14,8 @@ public:
 
 private:
     // Camera orbit
-    float m_cameraYaw{0.f}, m_characterYaw{};
+    float m_cameraYaw{0.f},
+        m_characterYaw{};// Set to camera's yaw when character is moved
     float m_cameraPitch{-.1f};
     float m_cameraDistance{50.0f};
     float m_mouseSensitivity{0.005f};

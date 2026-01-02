@@ -94,7 +94,7 @@ void DebugDemoScene::OnUpdate(float deltaTime) {
         TriVector pB(3.0f, 5.0f, 3.0f, 1.0f);
         BiVector line2 = pA & pB;
 
-        Motor rotation{cos(angle), 0, 0, 0, 0, sin(angle) , 0, 0};
+        Motor rotation{cosf(angle), 0, 0, 0, 0, sinf(angle) , 0, 0};
         BiVector rotatedLine = (rotation * line2 * ~rotation).Grade2();
         DrawDebugLine(rotatedLine, 6.0f, Scene::Color::Cyan());
 

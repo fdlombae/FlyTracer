@@ -89,11 +89,12 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
     if (direction.VNorm() == 0) return;// Not moving if no key is pressed
     direction /= direction.VNorm();// Normalizing vanishing part to prevent speed increase when moving diagonally
     float const speed{ m_movementSpeed * deltaSec };
+
+    Motor const R{ Motor::Rotation(m_cameraYaw * 1 / DEG_TO_RAD + 180.f, BiVector{0.f, 0.f, 0.f, 0.f, 1.f, 0.f}) };
+    direction = (R * direction * ~R).Grade2();// Making character move along its local axes
     // NOTE: Dividing by 2, because bireflection doubles the distance
     Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
     m_characterTranslation = T * m_characterTranslation;
-
-    Motor const R{ Motor::Rotation(m_cameraYaw * 1 / DEG_TO_RAD + 180.f, BiVector{0.f, 0.f, 0.f, 0.f, 1.f, 0.f}) };
     m_pCharacterMesh->transform = R * m_characterTranslation;
 }
 
