@@ -47,7 +47,7 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
     // Camera
     //m_cameraOrigin = TriVector(0.0f, 10.0f, 40.0f);
     // m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
-    // m_cameraUp = TriVector(0.0f, 1.0f, 0.0f, 0.0f);
+    m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
 
 void MainScene::OnUpdate(float const deltaSec) {
@@ -83,7 +83,6 @@ void MainScene::ProcessCameraMovement(InputState const &input) {
 
     m_cameraOrigin = (~m_characterTranslation * TriVector(camX, camY, camZ) * m_characterTranslation).Grade3().Normalized();
     m_cameraTarget = (~m_characterTranslation * TriVector(0.0f, targetY, 0.0f) * m_characterTranslation).Grade3().Normalized();
-    m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
 
 void MainScene::ProcessCharacterMovement(float const deltaSec) {
@@ -106,7 +105,7 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
 }
 
 bool MainScene::ResolveCameraCollisions() {
-    bool haveCollision{};
+    bool hasCollision{};
     // 1. Iterate over all the planes in the scene
     for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes) {
         // 2. For each plane, get the distance to it and check if distance is smaller than the collider's radius
@@ -118,29 +117,42 @@ bool MainScene::ResolveCameraCollisions() {
             // NOTE: Vector's Euclidean coefficients are the components of its Euclidean normal
             Motor const T{ 1.f, vector.e1(), vector.e2(), vector.e3(), 0.f, 0.f, 0.f, 0.f};
             m_cameraOrigin = (T * m_cameraOrigin * ~T).Grade3();
-            haveCollision = true;
+            hasCollision = true;// Not returning in case there are other collisions to process
         }
     }
-    return haveCollision;
+    return hasCollision;
 }
 
 bool MainScene::ResolveCharacterCollisions()
 {
-    return false;
-    // 1. Iterate over all the planes in the scene
-    for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes) {
-        // 2. For each plane, get the distance to it and check if distance is smaller than the collider's radius
-        TriVector const characterOrigin{ (m_characterTranslation * TriVector{0.f, 0.f, 0.f, 1.f} * ~m_characterTranslation).Grade3() };
-        Vector const plane{ gpuPlane.GetPlane() };
-        if (float const planeCharacterSignedDistance{ (gpuPlane.GetPlane() & characterOrigin) };// NOTE: Both objects are already normalized
-            planeCharacterSignedDistance < m_characterColliderRadius)
+    bool hasCollision{};
+    // 1. Getting the top and bottom spheres(origins)
+    TriVector const characterOrigin{ (m_characterTranslation * TriVector{0.f, 0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized() };
+    TriVector const topOrigin{ (characterOrigin/* + m_characterUp * (m_characterColliderHeight - m_characterColliderRadius)*/).Normalized() },
+        bottomOrigin{ (characterOrigin/* + m_characterUp * m_characterColliderRadius*/).Normalized() };
+    // 2. Iterating over planes
+    for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes)
+    {
+        // 1. Getting the signed distances of each sphere to the plane
+        float const topDistance{ (gpuPlane.GetPlane() & topOrigin) },
+            bottomDistance{ (gpuPlane.GetPlane() & bottomOrigin) };
+        // 2. Finding the closest sphere
+        float const smallestSignedDistance{
+            std::abs(topDistance) < std::abs(bottomDistance) ? topDistance : bottomDistance
+        };
+        std::cout << "Smallest distance = " << smallestSignedDistance << std::endl;
+        // 3. Seeing if the distance of the closest one is smaller than the radius
+        if (std::abs(smallestSignedDistance) < m_characterColliderRadius)
         {
-            // 3. Move the character along plane's normal by distance - radius
-            Vector pgaPlane{ gpuPlane.GetPlane().Normalized() * (planeCharacterSignedDistance - m_characterColliderRadius) };
+            // 4. Moving the character away by normal * (distance - radius)
+            Vector vector{ gpuPlane.GetPlane() * (smallestSignedDistance - m_characterColliderRadius) };
             // NOTE: Vector's Euclidean coefficients are the components of its Euclidean normal
-            Motor const T{ 1.f, pgaPlane.e1(), pgaPlane.e2(), pgaPlane.e3(), 0.f, 0.f, 0.f, 0.f};
+            Motor const T{ 1.f, vector.e1(), vector.e2(), vector.e3(), 0.f, 0.f, 0.f, 0.f};
             m_characterTranslation = T * m_characterTranslation;
-            std::cout << planeCharacterSignedDistance << std::endl;
+            hasCollision = true;
         }
+
     }
+
+    return hasCollision;
 }
