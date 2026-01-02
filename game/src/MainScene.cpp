@@ -32,14 +32,16 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
              Scene::Material::Lambert(Scene::Color(0.5f, 0.9f, 0.5f)));
 
     // Capsule
-    m_characterMeshId = LoadMesh("capsule.obj", "");
+    m_characterMeshId = LoadMesh("capsule.obj", "capsule.png");
     AddMeshInstance(m_characterMeshId, TriVector(0.f, 0.f, 0.f), "character");
     m_pCharacterMesh = FindInstance("character");
     m_pCharacterMesh ->scale = 5.f;
 
-    // Point light
-    AddPointLight(TriVector(0.0f, 20.0f, 0.0f),
-                  Scene::Color(1.0f, 1.0f, 1.0f), 2.0f, 100.0f);
+    // Point lights
+    for (int lightIdx{}; lightIdx < 10; ++lightIdx) {
+        AddPointLight(TriVector(0.0f, 20.0f, static_cast<float>(lightIdx) * 100.f),
+                      Scene::Color(1.0f, 1.0f, 1.0f), 2.0f, 100.0f);
+    }
 
     // Camera
     m_cameraOrigin = TriVector(0.0f, 10.0f, 60.0f);
@@ -88,7 +90,7 @@ void MainScene::ProcessMovement(float const deltaSec) {
     float const speed{ m_movementSpeed * deltaSec };
     // NOTE: Dividing by 2, because bireflection doubles the distance
     Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
-    m_pCharacterMesh->transform = ~T * m_pCharacterMesh->transform;
+    m_pCharacterMesh->transform = T * m_pCharacterMesh->transform;
 }
 
 void MainScene::ResolveCameraCollisions() {
