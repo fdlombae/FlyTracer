@@ -106,13 +106,13 @@ public:
         return id < m_meshes.size() ? m_meshes[id].get() : nullptr;
     }
 
-    [[nodiscard]] const TriVector& GetCameraEye() const noexcept { return m_cameraEye; }
+    [[nodiscard]] const TriVector& GetCameraEye() const noexcept { return m_cameraOrigin; }
     [[nodiscard]] const TriVector& GetCameraTarget() const noexcept { return m_cameraTarget; }
     [[nodiscard]] const TriVector& GetCameraUp() const noexcept { return m_cameraUp; }
     [[nodiscard]] float GetCameraFov() const noexcept { return m_cameraFov; }
 
     void SetCamera(const TriVector& eye, const TriVector& target, const TriVector& up) noexcept {
-        m_cameraEye = eye;
+        m_cameraOrigin = eye;
         m_cameraTarget = target;
         m_cameraUp = up;
     }
@@ -200,7 +200,7 @@ protected:
     std::vector<bool> m_meshCPUDataFreed;
     std::string m_textureFilename;
 
-    TriVector m_cameraEye{0.0f, 3.5f, 8.0f};
+    TriVector m_cameraOrigin{0.0f, 3.5f, 8.0f};
     TriVector m_cameraTarget{0.0f, 1.5f, 0.0f};
     TriVector m_cameraUp{0.0f, 1.0f, 0.0f};
     float m_cameraFov{45.0f};

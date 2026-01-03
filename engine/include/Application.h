@@ -54,7 +54,7 @@ private:
     void cleanup();
 
     // Window and basic properties
-    SDL_Window* m_window{nullptr};
+    SDL_Window* m_pWindow{nullptr};
     const int m_width;
     const int m_height;
     const std::string m_title;

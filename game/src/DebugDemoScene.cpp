@@ -1,4 +1,4 @@
-#include "DebugDemoScene.h"
+#include "../include/Scenes/DebugDemoScene.h"
 #include <algorithm>
 #include <cmath>
 #include <imgui.h>
@@ -28,7 +28,7 @@ void DebugDemoScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
                   Scene::Color(1.0f, 1.0f, 1.0f), 1.5f, 50.0f);
 
     // Camera
-    m_cameraEye = TriVector(15.0f, 10.0f, 15.0f);
+    m_cameraOrigin = TriVector(15.0f, 10.0f, 15.0f);
     m_cameraTarget = TriVector(0.0f, 3.0f, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 }
@@ -94,7 +94,7 @@ void DebugDemoScene::OnUpdate(float deltaTime) {
         TriVector pB(3.0f, 5.0f, 3.0f, 1.0f);
         BiVector line2 = pA & pB;
 
-        Motor rotation{cos(angle), 0, 0, 0, 0, sin(angle) , 0, 0};
+        Motor rotation{cosf(angle), 0, 0, 0, 0, sinf(angle) , 0, 0};
         BiVector rotatedLine = (rotation * line2 * ~rotation).Grade2();
         DrawDebugLine(rotatedLine, 6.0f, Scene::Color::Cyan());
 
@@ -109,7 +109,7 @@ void DebugDemoScene::OnUpdate(float deltaTime) {
 void DebugDemoScene::OnInput(const InputState& input) {
     // Camera orbit with right mouse
     if (input.rightMouseDown) {
-        m_cameraYaw += input.mouseDeltaX * m_mouseSensitivity;
+        m_cameraYaw -= input.mouseDeltaX * m_mouseSensitivity;
         m_cameraPitch += input.mouseDeltaY * m_mouseSensitivity;
         m_cameraPitch = std::clamp(m_cameraPitch, -1.4f, 1.4f);
     }
@@ -124,7 +124,7 @@ void DebugDemoScene::OnInput(const InputState& input) {
     const float camY = std::sin(m_cameraPitch) * m_cameraDistance + targetY;
     const float camZ = std::cos(m_cameraYaw) * std::cos(m_cameraPitch) * m_cameraDistance;
 
-    m_cameraEye = TriVector(camX, camY, camZ);
+    m_cameraOrigin = TriVector(camX, camY, camZ);
     m_cameraTarget = TriVector(0.0f, targetY, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
 

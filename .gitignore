@@ -1,3 +1,5 @@
+.obsidian
+
 # Build directories
 build*/
 cmake-build-*/
@@ -30,10 +32,11 @@ Makefile
 *.lo
 *.o
 *.obj
+!game/resources/*.obj
 
 # Precompiled Headers
 *.gch
-*.pch
+
 
 # Compiled Dynamic libraries
 *.so
