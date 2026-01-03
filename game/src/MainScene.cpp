@@ -114,9 +114,9 @@ bool MainScene::ResolveCameraCollisions() {
             planeCameraSignedDistance < m_cameraColliderRadius)
         {
             // 3. Move the camera along plane's normal by distance - radius
-            Vector vector{ gpuPlane.GetPlane() * (planeCameraSignedDistance - m_cameraColliderRadius) };
+            Vector const t{ gpuPlane.GetPlane() * (planeCameraSignedDistance - m_cameraColliderRadius) };// Translator
             // NOTE: Vector's Euclidean coefficients are the components of its Euclidean normal
-            Motor const T{ 1.f, vector.e1(), vector.e2(), vector.e3(), 0.f, 0.f, 0.f, 0.f};
+            Motor const T{ 1.f, t.e1(), t.e2(), t.e3(), 0.f, 0.f, 0.f, 0.f};
             m_cameraOrigin = (T * m_cameraOrigin * ~T).Grade3();
             hasCollision = true;// Not returning in case there are other collisions to process
         }
@@ -137,14 +137,14 @@ bool MainScene::ResolveCharacterCollisions()
     // 2. Iterating over planes
     for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes)
     {
-        // 1. Getting the signed distances of each sphere to the plane
+        // 2.1. Getting the signed distances of each sphere to the plane
         float const topDistance{ (gpuPlane.GetPlane() & topOrigin) },
             bottomDistance{ (gpuPlane.GetPlane() & bottomOrigin) };
-        // 2. Finding the closest sphere
+        // 2.2. Finding the closest sphere
         float const smallestSignedDistance{
             std::abs(topDistance) < std::abs(bottomDistance) ? topDistance : bottomDistance
         };
-        // 3. Seeing if the distance of the closest one is smaller than the radius
+        // 2.3. Seeing if the distance of the closest one is smaller than the radius
         if (std::abs(smallestSignedDistance) < m_characterColliderRadius)
         {
             // 4. Moving the character away by normal * (distance - radius)

@@ -1,3 +1,5 @@
+.obsidian
+
 # Build directories
 build*/
 cmake-build-*/
