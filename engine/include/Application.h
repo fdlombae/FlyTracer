@@ -122,4 +122,6 @@ private:
     // Row 0: right vector, Row 1: up vector, Row 2: forward vector (-Z)
     std::array<float, 9> m_cameraRotation{1, 0, 0, 0, 1, 0, 0, 0, 1};  // Identity rotation
     float m_cameraFov{45.0f};
+
+    void WrapCursorX() const;
 };

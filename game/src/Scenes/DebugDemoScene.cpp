@@ -1,4 +1,4 @@
-#include "../include/Scenes/DebugDemoScene.h"
+#include "../../include/Scenes/DebugDemoScene.h"
 #include <algorithm>
 #include <cmath>
 #include <imgui.h>
@@ -36,7 +36,8 @@ void DebugDemoScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
 void DebugDemoScene::OnUpdate(float deltaTime) {
     UpdateFPS(deltaTime);
 
-    if (!m_paused) {
+    if (!m_paused)
+    {
         m_time += deltaTime * m_rotationSpeed;
     }
 

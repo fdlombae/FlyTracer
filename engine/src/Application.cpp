@@ -8,6 +8,8 @@
 #include <algorithm>
 
 #define STB_IMAGE_IMPLEMENTATION
+#include <iostream>
+
 #include "stb_image.h"
 
 Application::Application(int width, int height, const std::string& title,
@@ -78,7 +80,8 @@ void Application::uploadMeshes(const std::vector<std::unique_ptr<Mesh>>& meshes)
     m_renderer->UploadMeshes(meshes);
 }
 
-void Application::initSDL() {
+void Application::initSDL()
+{
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         throw std::runtime_error("Failed to initialize SDL: " + std::string(SDL_GetError()));
     }
@@ -89,9 +92,11 @@ void Application::initSDL() {
         throw std::runtime_error("Failed to create window: " + std::string(SDL_GetError()));
     }
 
-    SDL_SetWindowRelativeMouseMode(m_pWindow, true);
+    if (!SDL_SetWindowRelativeMouseMode(m_pWindow, true))
+    {
+        std::cout << "Failed to enable relative mouse mode" << std::endl;
+    }
 }
-
 
 void Application::run() {
     m_running = true;
@@ -255,6 +260,8 @@ void Application::handleEvents() {
             m_renderer->WaitIdle();
         }
     }
+
+    WrapCursorX();
 }
 
 void Application::processInput(float deltaTime) {
@@ -455,4 +462,20 @@ void Application::cleanup() {
         SDL_DestroyWindow(m_pWindow);
     }
     SDL_Quit();
+}
+
+void Application::WrapCursorX() const
+{
+    // Fix for yaw stopping changing due to cursor hitting window borders
+    float x, y;
+    SDL_GetMouseState(&x, &y);
+    if (int const int_x{ static_cast<int>(x) };
+        int_x >= m_width-1)// -1, because this is the value cursor X has, when it gets stuck
+    {
+        SDL_WarpMouseInWindow(m_pWindow, 0.f, y);
+    }
+    else if (int_x == 0)
+    {
+        SDL_WarpMouseInWindow(m_pWindow, static_cast<float>(m_width), y);
+    }
 }

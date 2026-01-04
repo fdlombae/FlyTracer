@@ -1,11 +1,9 @@
 #include "Scenes/MainScene.h"
 #include <algorithm>
 #include <cmath>
-#include <imgui.h>
-
+#include "imgui.h"
 #include "FlyTracer.h"
 #include "SDL3/SDL.h"
-#include "SDL3/SDL_mouse.h"
 
 MainScene::MainScene(const std::string& resourceDir)
     : GameScene(resourceDir) {
@@ -33,9 +31,10 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
 
     // Capsule
     m_characterMeshId = LoadMesh("capsule.obj", "capsule.png");
-    AddMeshInstance(m_characterMeshId, TriVector(0.f, 0.f, 0.f), "character");
-    m_pCharacterMesh = FindInstance("character");
-    m_pCharacterMesh ->scale = 5.f;
+    AddMeshInstance(m_characterMeshId, TriVector(0.f, 0.f, 0.f), m_characterMeshName);
+    //AddEnemy();
+    m_pCharacterMesh = FindInstance(m_characterMeshName);
+    m_pCharacterMesh ->scale = m_capsuleScale;
 
     // Point lights
     for (int lightIdx{}; lightIdx < 10; ++lightIdx) {
@@ -48,6 +47,7 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
     //m_cameraOrigin = TriVector(0.0f, 10.0f, 40.0f);
     // m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
+
 }
 
 void MainScene::OnUpdate(float const deltaSec) {
@@ -65,9 +65,15 @@ void MainScene::OnInput(const InputState& input) {
         m_cameraYaw = oldCameraYaw;
         m_cameraPitch = oldCameraPitch;
     }
+
 }
 
 void MainScene::ProcessCameraMovement(InputState const &input) {
+    float cursorX, cursorY;
+    SDL_GetMouseState(&cursorX, &cursorY);
+    m_cursorX -= m_cursorX - cursorX;
+    m_cursorY -= m_cursorY - cursorY;
+
     m_cameraYaw -= input.mouseDeltaX * m_mouseSensitivity;
     m_cameraPitch += input.mouseDeltaY * m_mouseSensitivity;
     //m_cameraPitch = std::clamp(m_cameraPitch, -1.4f, 1.4f);
@@ -83,7 +89,6 @@ void MainScene::ProcessCameraMovement(InputState const &input) {
 
     m_cameraOrigin = (~m_characterTranslation * TriVector(camX, camY, camZ) * m_characterTranslation).Grade3().Normalized();
     m_cameraTarget = (~m_characterTranslation * TriVector(0.0f, targetY, 0.0f) * m_characterTranslation).Grade3().Normalized();
-    std::cout << m_cameraYaw * 1 / DEG_TO_RAD << std::endl;
 }
 
 void MainScene::ProcessCharacterMovement(float const deltaSec) {
@@ -102,6 +107,7 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
     // NOTE: Dividing by 2, because bireflection doubles the distance
     Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
     m_characterTranslation = T * m_characterTranslation;
+    m_pCharacterMesh = FindInstance(m_characterMeshName);// Must be done, after a new instance is created, the order is not valid anymore.
     m_pCharacterMesh->transform = R * m_characterTranslation;
 }
 
@@ -130,9 +136,9 @@ bool MainScene::ResolveCharacterCollisions()
     // 1. Getting the top and bottom spheres(origins)
     TriVector const characterOrigin{ (m_characterTranslation * TriVector{0.f,  0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized() };
     TriVector topOrigin{ characterOrigin };
-    topOrigin.e013() = m_characterColliderHeight - m_characterColliderRadius;
+    topOrigin.e013() = m_capsuleColliderHeight - m_capsuleColliderRadius;
     TriVector bottomOrigin{ characterOrigin };
-    bottomOrigin.e013() = m_characterColliderRadius;
+    bottomOrigin.e013() = m_capsuleColliderRadius;
 
     // 2. Iterating over planes
     for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes)
@@ -145,10 +151,10 @@ bool MainScene::ResolveCharacterCollisions()
             std::abs(topDistance) < std::abs(bottomDistance) ? topDistance : bottomDistance
         };
         // 2.3. Seeing if the distance of the closest one is smaller than the radius
-        if (std::abs(smallestSignedDistance) < m_characterColliderRadius)
+        if (std::abs(smallestSignedDistance) < m_capsuleColliderRadius)
         {
             // 4. Moving the character away by normal * (distance - radius)
-            Vector vector{ gpuPlane.GetPlane() * (smallestSignedDistance - m_characterColliderRadius) };
+            Vector vector{ gpuPlane.GetPlane() * (smallestSignedDistance - m_capsuleColliderRadius) };
             // NOTE: Vector's Euclidean coefficients are the components of its Euclidean normal
             Motor const T{ 1.f, vector.e1(), vector.e2(), vector.e3(), 0.f, 0.f, 0.f, 0.f};
             m_characterTranslation = T * m_characterTranslation;
@@ -158,4 +164,34 @@ bool MainScene::ResolveCharacterCollisions()
     }
 
     return hasCollision;
+}
+
+void MainScene::OnGui()
+{
+    RenderDebugDraw();
+    float x, y;
+    SDL_GetMouseState(&x, &y);
+
+    ImGui::Begin("Main Scene");
+    ImGui::Text("Mouse location: %.1f, %.1f", x, y);
+    ImGui::End();
+}
+
+void MainScene::AddEnemy()
+{
+    m_enemyMeshId = LoadMesh("capsule.obj", "capsule.png");
+    AddMeshInstance(m_enemyMeshId, TriVector(20.f, 00.f, 50.f), "enemy");
+}
+
+void MainScene::UpdateEnemy(float const deltaSec)
+{
+    // Rotating the enemy towards the character
+    // How to determine the angle between 2 trivectors?
+    // Dot product..
+    // 1. Determining position of character's head
+    TriVector const characterOrigin{ (m_characterTranslation * TriVector{0.f,  0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized() };
+    TriVector topOrigin{ characterOrigin };
+    topOrigin.e013() = m_capsuleColliderHeight - m_capsuleColliderRadius;
+    // 2. Determining position of the enemy's head
+
 }
