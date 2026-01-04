@@ -218,16 +218,26 @@ void MainScene::RotateEnemy()
     // 2. Calculating final enemy's direction
     BiVector const finalEnemyViewDirection{ (enemyOrigin & characterOrigin).Normalized() };
 
-    // 3. Calculating the angle between the initial and final directions
+    // 3. Getting the angle between direction vectors
+    // 3.1. Getting cos of the angle between the direction vectors
     // NOTE: enemyViewDirection and finalEnemyViewDirection are normalized, so there's no need to divide by the product of norms
-    float dot{ (enemyViewDirection | finalEnemyViewDirection) };
-    std::cout << "Dot: " << dot << std::endl;
-    // Clamping dot to [-1, 1], because std::acos will result in NaN outside of it.
-    // NOTE: The value can get outside of this range due to floating point precision errors.
-    if (dot < -1) dot = -1;
-    else if (dot > 1) dot = 1;
+    float cos{ (enemyViewDirection | finalEnemyViewDirection) };
 
-    float const directionRadians{ std::acos(dot) };
+    // Clamping dot to [-1, 1], because std::acos will result in NaN outside of it
+    // NOTE: The value can get outside of this range due to floating point precision errors
+    if (cos < -1) cos = -1;
+    else if (cos > 1) cos = 1;
+
+    // 3.2. Getting sin of the angle between the direction vectors
+    // NOTE: Not using meet directly, because that alone will result in void
+    BiVector const wedge{(enemyViewDirection * finalEnemyViewDirection).Grade2()};
+    float const sinSign{ GetEuclideanSign(wedge) };
+    std::cout << sinSign << std::endl;
+    float const sin{ sinSign * wedge.Norm() };
+    //std::cout << "Sin: " << sin << std::endl;
+
+    // 3.3. Finding the angle
+    float const directionRadians{ std::atan2(sin, cos) };
 
     // 4. Creating rotation motor and applying it to the enemy's mesh
     Motor const R{ Motor::Rotation(directionRadians * RAD_TO_DEG, m_yAxis) };
@@ -247,5 +257,18 @@ void MainScene::UpdateEnemyMeshTransform()
     {
         pEnemyMesh->transform = m_enemyRotation * m_enemyTranslation;
     }
+}
 
+float MainScene::GetSign(float const value) const
+{
+    float const denominator{ std::abs(value) < SDL_FLT_EPSILON ? 1.f : std::abs(value) };
+    return value / denominator;
+}
+
+float MainScene::GetEuclideanSign(BiVector const& biVector) const
+{
+    float const a{ std::abs(biVector.e23()) < SDL_FLT_EPSILON ? 1.f : biVector.e23() },
+        b{ std::abs(biVector.e31()) < SDL_FLT_EPSILON ? 1.f : biVector.e31() },
+        c{ std::abs(biVector.e12()) < SDL_FLT_EPSILON ? 1.f : biVector.e12()  };
+    return GetSign(a*b*c);
 }

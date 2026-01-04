@@ -17,7 +17,7 @@ private:
     // Camera orbit
     float m_cameraYaw{-0.75f};
     float m_cameraPitch{-.1f};
-    float m_cameraDistance{15.0f};
+    float m_cameraDistance{30.0f};
     float m_mouseSensitivity{0.005f};
     float m_cameraColliderRadius{ .01f };
 
@@ -58,4 +58,7 @@ private:
     void RotateEnemy();
     TriVector GetEnemyOrigin() const;
     void UpdateEnemyMeshTransform();
+
+    float GetSign(float value) const;
+    float GetEuclideanSign(BiVector const&) const;
 };
