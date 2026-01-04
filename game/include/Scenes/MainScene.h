@@ -11,10 +11,13 @@ public:
     void OnInput(const InputState& input) override;
 
 private:
+    BiVector const m_yAxis{0.f, 0.f, 0.f, 0.f, 1.f, 0.f}/*e31*/,
+        m_zAxis{0.f, 0.f, 0.f, 0.f, 0.f, 1.f}/*e12*/;
+
     // Camera orbit
     float m_cameraYaw{-0.75f};
     float m_cameraPitch{-.1f};
-    float m_cameraDistance{40.0f};
+    float m_cameraDistance{15.0f};
     float m_mouseSensitivity{0.005f};
     float m_cameraColliderRadius{ .01f };
 
@@ -27,20 +30,32 @@ private:
     float  m_characterYaw{};// Set to camera's yaw when character is moved
     Motor m_characterTranslation{ 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
     uint32_t m_characterMeshId{};
-    MeshInstance* m_pCharacterMesh{};
     float m_movementSpeed{ 60.f }; // units/s
     // Enemy
     std::string const m_enemyMeshName{ "enemy" };
     uint32_t m_enemyMeshId{};
     TriVector m_GunSocket{ m_capsuleColliderRadius, 0.5f * m_capsuleColliderHeight, 0.f};
+    MeshInstance* m_pEnemyMesh{};
+    Motor m_enemyTranslation{/*Set in OnInit()*/}, m_enemyRotation{ Motor::Rotation(0.f, m_yAxis) };
+    BiVector m_enemyInitialDirection{ m_zAxis };
+
+    void OnGui() override;
 
     void ProcessCameraMovement(InputState const& input);
     void ProcessCharacterMovement(float deltaSec);
+    // Collision
     // Return if there were collisions
     bool ResolveCameraCollisions();
     bool ResolveCharacterCollisions();
-    void OnGui() override;
+    // Character
+    TriVector GetCharacterTopSphereOrigin() const;
+    TriVector GetCharacterBottomSphereOrigin() const;
+    TriVector GetCharacterOrigin() const;
     // Enemy
     void AddEnemy();
-    void UpdateEnemy(float deltaSec);
+    // Updates m_enemyTranslation, but does not affect m_enemyRotation.
+    // Call UpdateEnemyMeshTransform() to update the mesh.
+    void RotateEnemy();
+    TriVector GetEnemyOrigin() const;
+    void UpdateEnemyMeshTransform();
 };

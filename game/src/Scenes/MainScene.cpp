@@ -32,9 +32,11 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
     // Capsule
     m_characterMeshId = LoadMesh("capsule.obj", "capsule.png");
     AddMeshInstance(m_characterMeshId, TriVector(0.f, 0.f, 0.f), m_characterMeshName);
-    //AddEnemy();
-    m_pCharacterMesh = FindInstance(m_characterMeshName);
-    m_pCharacterMesh ->scale = m_capsuleScale;
+    if (MeshInstance* pCharacterMesh = FindInstance(m_characterMeshName); pCharacterMesh)
+    {
+        pCharacterMesh->scale = m_capsuleScale;
+    }
+    AddEnemy();
 
     // Point lights
     for (int lightIdx{}; lightIdx < 10; ++lightIdx) {
@@ -47,13 +49,14 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
     //m_cameraOrigin = TriVector(0.0f, 10.0f, 40.0f);
     // m_cameraTarget = TriVector(0.0f, 10.0f, 0.0f);
     m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);
-
 }
 
 void MainScene::OnUpdate(float const deltaSec) {
     UpdateFPS(deltaSec);
     ProcessCharacterMovement(deltaSec);
     ResolveCharacterCollisions();
+    RotateEnemy();
+    UpdateEnemyMeshTransform();
 }
 
 void MainScene::OnInput(const InputState& input) {
@@ -102,13 +105,15 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
     direction /= direction.VNorm();// Normalizing vanishing part to prevent speed increase when moving diagonally
     float const speed{ m_movementSpeed * deltaSec };
 
-    Motor const R{ Motor::Rotation(m_cameraYaw * 1 / DEG_TO_RAD + 180.f, BiVector{0.f, 0.f, 0.f, 0.f, 1.f, 0.f}) };
+    Motor const R{ Motor::Rotation(m_cameraYaw * RAD_TO_DEG + 180.f, m_yAxis) };
     direction = (R * direction * ~R).Grade2();// Making character move along its local axes
     // NOTE: Dividing by 2, because bireflection doubles the distance
     Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
     m_characterTranslation = T * m_characterTranslation;
-    m_pCharacterMesh = FindInstance(m_characterMeshName);// Must be done, after a new instance is created, the order is not valid anymore.
-    m_pCharacterMesh->transform = R * m_characterTranslation;
+    if (MeshInstance* pCharacterMesh{ FindInstance(m_characterMeshName)}; pCharacterMesh)// Must be done, after a new instance is created, the order is not valid anymore.
+    {
+        pCharacterMesh->transform = R * m_characterTranslation;
+    }
 }
 
 bool MainScene::ResolveCameraCollisions() {
@@ -134,11 +139,7 @@ bool MainScene::ResolveCharacterCollisions()
 {
     bool hasCollision{};
     // 1. Getting the top and bottom spheres(origins)
-    TriVector const characterOrigin{ (m_characterTranslation * TriVector{0.f,  0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized() };
-    TriVector topOrigin{ characterOrigin };
-    topOrigin.e013() = m_capsuleColliderHeight - m_capsuleColliderRadius;
-    TriVector bottomOrigin{ characterOrigin };
-    bottomOrigin.e013() = m_capsuleColliderRadius;
+    TriVector const topOrigin{ GetCharacterTopSphereOrigin() }, bottomOrigin{ GetCharacterBottomSphereOrigin() };
 
     // 2. Iterating over planes
     for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes)
@@ -166,6 +167,25 @@ bool MainScene::ResolveCharacterCollisions()
     return hasCollision;
 }
 
+TriVector MainScene::GetCharacterTopSphereOrigin() const
+{
+    TriVector topOrigin{GetCharacterOrigin()};
+    topOrigin.e013() = m_capsuleColliderHeight - m_capsuleColliderRadius;
+    return topOrigin;
+}
+
+TriVector MainScene::GetCharacterBottomSphereOrigin() const
+{
+    TriVector bottomOrigin{ GetCharacterOrigin() };
+    bottomOrigin.e013() = m_capsuleColliderRadius;
+    return bottomOrigin;
+}
+
+TriVector MainScene::GetCharacterOrigin() const
+{
+    return (m_characterTranslation * TriVector{0.f,  0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized();
+}
+
 void MainScene::OnGui()
 {
     RenderDebugDraw();
@@ -180,18 +200,52 @@ void MainScene::OnGui()
 void MainScene::AddEnemy()
 {
     m_enemyMeshId = LoadMesh("capsule.obj", "capsule.png");
-    AddMeshInstance(m_enemyMeshId, TriVector(20.f, 00.f, 50.f), "enemy");
+    AddMeshInstance(m_enemyMeshId, TriVector(0.f, 0.f, 20.f), "enemy");
+    if (MeshInstance* pEnemyMesh = FindInstance(m_enemyMeshName); pEnemyMesh)
+    {
+        pEnemyMesh->scale = m_capsuleScale;
+        m_enemyTranslation = pEnemyMesh->transform;
+    }
 }
 
-void MainScene::UpdateEnemy(float const deltaSec)
+void MainScene::RotateEnemy()
 {
-    // Rotating the enemy towards the character
-    // How to determine the angle between 2 trivectors?
-    // Dot product..
-    // 1. Determining position of character's head
-    TriVector const characterOrigin{ (m_characterTranslation * TriVector{0.f,  0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized() };
-    TriVector topOrigin{ characterOrigin };
-    topOrigin.e013() = m_capsuleColliderHeight - m_capsuleColliderRadius;
-    // 2. Determining position of the enemy's head
+    // 1. Retrieving character and enemy origins, and enemy view direction
+    TriVector const characterOrigin{ GetCharacterOrigin().Normalized() },
+        enemyOrigin{ GetEnemyOrigin().Normalized() };
+    BiVector const enemyViewDirection{ (m_enemyRotation * m_enemyInitialDirection * ~m_enemyRotation).Grade2().Normalized() };
+
+    // 2. Calculating final enemy's direction
+    BiVector const finalEnemyViewDirection{ (enemyOrigin & characterOrigin).Normalized() };
+
+    // 3. Calculating the angle between the initial and final directions
+    // NOTE: enemyViewDirection and finalEnemyViewDirection are normalized, so there's no need to divide by the product of norms
+    float dot{ (enemyViewDirection | finalEnemyViewDirection) };
+    std::cout << "Dot: " << dot << std::endl;
+    // Clamping dot to [-1, 1], because std::acos will result in NaN outside of it.
+    // NOTE: The value can get outside of this range due to floating point precision errors.
+    if (dot < -1) dot = -1;
+    else if (dot > 1) dot = 1;
+
+    float const directionRadians{ std::acos(dot) };
+
+    // 4. Creating rotation motor and applying it to the enemy's mesh
+    Motor const R{ Motor::Rotation(directionRadians * RAD_TO_DEG, m_yAxis) };
+    m_enemyRotation = R * m_enemyRotation;
+
+    std::cout << "Direction degrees: " << directionRadians * RAD_TO_DEG << std::endl << std::endl;
+}
+
+TriVector MainScene::GetEnemyOrigin() const
+{
+    return (m_enemyTranslation * TriVector{0.f,  0.f, 0.f} * ~m_enemyTranslation).Grade3().Normalized();
+}
+
+void MainScene::UpdateEnemyMeshTransform()
+{
+    if (MeshInstance* pEnemyMesh = FindInstance(m_enemyMeshName); pEnemyMesh)
+    {
+        pEnemyMesh->transform = m_enemyRotation * m_enemyTranslation;
+    }
 
 }
