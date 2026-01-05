@@ -1,5 +1,7 @@
 #pragma once
+#include <functional>
 
+#include "Collisions.h"
 #include "GameScene.h"
 
 class MainScene final : public GameScene {
@@ -48,7 +50,9 @@ private:
     bool ResolveCameraCollisions();
     bool ResolveCharacterPlaneCollisions();
     bool ResolveCharacterEnemyCollisions();
-    // Character
+    template <Collider T>
+    bool ResolveWallCollisions(T const& collider, std::function<void(Motor const&)> sink);
+        // Character
     TriVector GetCharacterTopSphereOrigin() const;
     TriVector GetCharacterBottomSphereOrigin() const;
     TriVector GetCharacterOrigin() const;
@@ -63,3 +67,19 @@ private:
     float GetSign(float value) const;
     float GetEuclideanSign(BiVector const&) const;
 };
+
+template <Collider T>
+bool MainScene::ResolveWallCollisions(T const& collider, std::function<void(Motor const&)> const sink)
+{
+    bool hasCollision{};
+    for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes)
+    {
+        if (auto const transform{ ProcessCollision(collider, gpuPlane.GetPlane())};
+            transform.has_value())
+        {
+            sink(transform.value());
+            hasCollision = true;// Not returning in case there are other collisions to process
+        }
+    }
+    return hasCollision;
+}

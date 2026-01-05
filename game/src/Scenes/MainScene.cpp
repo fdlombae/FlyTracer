@@ -1,6 +1,7 @@
 #include "Scenes/MainScene.h"
 #include <algorithm>
 #include <cmath>
+#include <concepts>
 
 #include "Collisions.h"
 #include "imgui.h"
@@ -119,43 +120,23 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
 }
 
 bool MainScene::ResolveCameraCollisions() {
-    bool hasCollision{};
-    Sphere const cameraCollider{ m_cameraOrigin, m_cameraColliderRadius };
-    for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes) {
-        if (auto const T{ ProcessCollision(cameraCollider, gpuPlane.GetPlane())};
-            T.has_value())
-        {
-            m_cameraOrigin = (T.value() * m_cameraOrigin * ~T.value()).Grade3();
-            hasCollision = true;// Not returning in case there are other collisions to process
-        }
-    }
-    return hasCollision;
+    return ResolveWallCollisions(
+        Sphere( m_cameraOrigin, m_cameraColliderRadius ),
+        [this](Motor const& T){ m_cameraOrigin = (T * m_cameraOrigin * ~T).Grade3(); }
+        );
 }
 
 bool MainScene::ResolveCharacterPlaneCollisions()
 {
-    bool hasCollision{};
-
-    Capsule const characterCollider{ GetCharacterOrigin(), m_capsuleColliderRadius, m_capsuleColliderHeight };
-    for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes)
-    {
-        if (auto const T{ ProcessCollision(characterCollider, gpuPlane.GetPlane())};
-            T.has_value())
-        {
-            m_characterTranslation = T.value() * m_characterTranslation;
-            hasCollision = true;// Not returning in case there are other collisions to process
-        }
-    }
-
-    return hasCollision;
+    return ResolveWallCollisions(
+        Capsule( GetCharacterOrigin(), m_capsuleColliderRadius, m_capsuleColliderHeight ),
+        [this](Motor const& T){ m_characterTranslation = T * m_characterTranslation; }
+        );
 }
 
 bool MainScene::ResolveCharacterEnemyCollisions()
 {
     TriVector const enemyOrigin{ GetEnemyOrigin() }, characterOrigin{ GetCharacterOrigin() };
-
-    // 2.
-
     return false;
 }
 
