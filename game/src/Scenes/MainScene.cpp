@@ -1,6 +1,8 @@
 #include "Scenes/MainScene.h"
 #include <algorithm>
 #include <cmath>
+
+#include "Collisions.h"
 #include "imgui.h"
 #include "FlyTracer.h"
 #include "SDL3/SDL.h"
@@ -54,7 +56,7 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
 void MainScene::OnUpdate(float const deltaSec) {
     UpdateFPS(deltaSec);
     ProcessCharacterMovement(deltaSec);
-    ResolveCharacterCollisions();
+    ResolveCharacterPlaneCollisions();
     RotateEnemy();
     UpdateEnemyMeshTransform();
 }
@@ -118,67 +120,43 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
 
 bool MainScene::ResolveCameraCollisions() {
     bool hasCollision{};
-    // 1. Iterate over all the planes in the scene
+    Sphere const cameraCollider{ m_cameraOrigin, m_cameraColliderRadius };
     for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes) {
-        // 2. For each plane, get the distance to it and check if distance is smaller than the collider's radius
-        if (float const planeCameraSignedDistance{ (gpuPlane.GetPlane() & m_cameraOrigin) };// NOTE: Both objects are already normalized
-            planeCameraSignedDistance < m_cameraColliderRadius)
+        if (auto const T{ ProcessCollision(cameraCollider, gpuPlane.GetPlane())};
+            T.has_value())
         {
-            // 3. Move the camera along plane's normal by distance - radius
-            Vector const t{ gpuPlane.GetPlane() * (planeCameraSignedDistance - m_cameraColliderRadius) };// Translator
-            // NOTE: Vector's Euclidean coefficients are the components of its Euclidean normal
-            Motor const T{ 1.f, t.e1(), t.e2(), t.e3(), 0.f, 0.f, 0.f, 0.f};
-            m_cameraOrigin = (T * m_cameraOrigin * ~T).Grade3();
+            m_cameraOrigin = (T.value() * m_cameraOrigin * ~T.value()).Grade3();
             hasCollision = true;// Not returning in case there are other collisions to process
         }
     }
     return hasCollision;
 }
 
-bool MainScene::ResolveCharacterCollisions()
+bool MainScene::ResolveCharacterPlaneCollisions()
 {
     bool hasCollision{};
-    // 1. Getting the top and bottom spheres(origins)
-    TriVector const topOrigin{ GetCharacterTopSphereOrigin() }, bottomOrigin{ GetCharacterBottomSphereOrigin() };
 
-    // 2. Iterating over planes
+    Capsule const characterCollider{ GetCharacterOrigin(), m_capsuleColliderRadius, m_capsuleColliderHeight };
     for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes)
     {
-        // 2.1. Getting the signed distances of each sphere to the plane
-        float const topDistance{ (gpuPlane.GetPlane() & topOrigin) },
-            bottomDistance{ (gpuPlane.GetPlane() & bottomOrigin) };
-        // 2.2. Finding the closest sphere
-        float const smallestSignedDistance{
-            std::abs(topDistance) < std::abs(bottomDistance) ? topDistance : bottomDistance
-        };
-        // 2.3. Seeing if the distance of the closest one is smaller than the radius
-        if (std::abs(smallestSignedDistance) < m_capsuleColliderRadius)
+        if (auto const T{ ProcessCollision(characterCollider, gpuPlane.GetPlane())};
+            T.has_value())
         {
-            // 4. Moving the character away by normal * (distance - radius)
-            Vector vector{ gpuPlane.GetPlane() * (smallestSignedDistance - m_capsuleColliderRadius) };
-            // NOTE: Vector's Euclidean coefficients are the components of its Euclidean normal
-            Motor const T{ 1.f, vector.e1(), vector.e2(), vector.e3(), 0.f, 0.f, 0.f, 0.f};
-            m_characterTranslation = T * m_characterTranslation;
-            hasCollision = true;
+            m_characterTranslation = T.value() * m_characterTranslation;
+            hasCollision = true;// Not returning in case there are other collisions to process
         }
-
     }
 
     return hasCollision;
 }
 
-TriVector MainScene::GetCharacterTopSphereOrigin() const
+bool MainScene::ResolveCharacterEnemyCollisions()
 {
-    TriVector topOrigin{GetCharacterOrigin()};
-    topOrigin.e013() = m_capsuleColliderHeight - m_capsuleColliderRadius;
-    return topOrigin;
-}
+    TriVector const enemyOrigin{ GetEnemyOrigin() }, characterOrigin{ GetCharacterOrigin() };
 
-TriVector MainScene::GetCharacterBottomSphereOrigin() const
-{
-    TriVector bottomOrigin{ GetCharacterOrigin() };
-    bottomOrigin.e013() = m_capsuleColliderRadius;
-    return bottomOrigin;
+    // 2.
+
+    return false;
 }
 
 TriVector MainScene::GetCharacterOrigin() const
@@ -231,10 +209,7 @@ void MainScene::RotateEnemy()
     // 3.2. Getting sin of the angle between the direction vectors
     // NOTE: Not using meet directly, because that alone will result in void
     BiVector const wedge{(enemyViewDirection * finalEnemyViewDirection).Grade2()};
-    float const sinSign{ GetEuclideanSign(wedge) };
-    std::cout << sinSign << std::endl;
-    float const sin{ sinSign * wedge.Norm() };
-    //std::cout << "Sin: " << sin << std::endl;
+    float const sin{ GetEuclideanSign(wedge) * wedge.Norm() };
 
     // 3.3. Finding the angle
     float const directionRadians{ std::atan2(sin, cos) };
@@ -243,7 +218,6 @@ void MainScene::RotateEnemy()
     Motor const R{ Motor::Rotation(directionRadians * RAD_TO_DEG, m_yAxis) };
     m_enemyRotation = R * m_enemyRotation;
 
-    std::cout << "Direction degrees: " << directionRadians * RAD_TO_DEG << std::endl << std::endl;
 }
 
 TriVector MainScene::GetEnemyOrigin() const

@@ -46,7 +46,8 @@ private:
     // Collision
     // Return if there were collisions
     bool ResolveCameraCollisions();
-    bool ResolveCharacterCollisions();
+    bool ResolveCharacterPlaneCollisions();
+    bool ResolveCharacterEnemyCollisions();
     // Character
     TriVector GetCharacterTopSphereOrigin() const;
     TriVector GetCharacterBottomSphereOrigin() const;
