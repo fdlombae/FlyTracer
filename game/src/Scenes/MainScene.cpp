@@ -191,10 +191,6 @@ void MainScene::OnGui()
     float x, y;
     SDL_GetMouseState(&x, &y);
 
-    ImGui::Begin("Main Scene");
-    ImGui::Text("Mouse location: %.1f, %.1f", x, y);
-    ImGui::End();
-
     RenderDebugDraw();// Rendering blaster bolts
 }
 

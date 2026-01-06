@@ -430,12 +430,12 @@ void Application::render() {
     m_renderer->UpdatePlanes(m_sceneData.planes);
 
     // Build ImGui UI
-    ImGui::Begin("Controls");
-    ImGui::Text("FPS: %.1f", m_fps);
-    ImGui::Text("Frame: %u", m_frameCount);
-    ImGui::Text("Camera: (%.2f, %.2f, %.2f)", eyeX, eyeY, eyeZ);
-    ImGui::SliderFloat("FOV", &m_cameraFov, 20.0f, 120.0f);
-    ImGui::End();
+    // ImGui::Begin("Controls");
+    // ImGui::Text("FPS: %.1f", m_fps);
+    // ImGui::Text("Frame: %u", m_frameCount);
+    // ImGui::Text("Camera: (%.2f, %.2f, %.2f)", eyeX, eyeY, eyeZ);
+    // ImGui::SliderFloat("FOV", &m_cameraFov, 20.0f, 120.0f);
+    // ImGui::End();
 
     // Call scene's custom ImGui
     if (m_gameScene) {

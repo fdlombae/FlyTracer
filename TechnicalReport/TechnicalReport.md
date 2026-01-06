@@ -56,9 +56,11 @@ $$|d_A| < |d_B| => A\;is\;closer\;and\;vice\;versa$$
 $3)\;Performing\;collision\;handling\;on\;the\;closest\;sphere.$
 $See$ [[#Sphere-plane collisions(for camera)]].
 $\textbf{NOTE}:Instead\;of\;applying\;translation\;to\;sphere's\;origin,\; it\;should\;get\;applied\;to\;the\;capsule's\;origin.$
+## Enemy rotation
+
 ## Lazer shooting
 Dual of points, Angle determination using dot product, bivector creation using join.
-## Lazer reflection
+
 
 ***
 ## Formulas used
