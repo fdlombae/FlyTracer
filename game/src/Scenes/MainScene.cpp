@@ -63,7 +63,12 @@ void MainScene::OnUpdate(float const deltaSec) {
     UpdateEnemyMeshTransform();
     ResolveCharacterEnemyCollisions();
 
-    DrawDebugLine(boltA, boltB);
+    if (m_pBolt)
+    {
+        m_pBolt->Update(deltaSec);
+        auto const[A, B]{ m_pBolt->GetPoints() };
+        DrawDebugLine(A, B);
+    }
 }
 
 void MainScene::OnInput(const InputState& input) {
@@ -117,7 +122,7 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
     direction /= direction.VNorm();// Normalizing vanishing part to prevent speed increase when moving diagonally
     float const speed{ m_movementSpeed * deltaSec };
 
-    // Rotating character in the movement idrection
+    // Rotating character in the movement direction
     m_characterYawRadians = m_cameraYaw + std::numbers::pi;
     Motor const R{ GetCharacterRotation() };
     direction = (R * direction * ~R).Grade2();// Making character move along its local axes
@@ -191,12 +196,7 @@ void MainScene::Shoot()
     BiVector const trajectory{ (gunPointOffset * GetCharacterDirection() * ~gunPointOffset).Grade2().Normalized() };
 
     // Creating bolt
-    static constexpr float boltLength{ 2.f };
-    TriVector const A{ gunSocket },
-    B{ OffsetPointAlongLine(A, trajectory, boltLength) };
-
-    boltA = A;
-    boltB = B;
+    m_pBolt = std::make_unique<Bolt>(gunSocket, trajectory);
 }
 
 void MainScene::OnGui()
@@ -269,4 +269,3 @@ void MainScene::UpdateEnemyMeshTransform()
         pEnemyMesh->transform = m_enemyRotation * m_enemyTranslation;
     }
 }
-

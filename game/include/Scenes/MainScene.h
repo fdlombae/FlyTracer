@@ -4,6 +4,7 @@
 #include "Collisions.h"
 #include "GameScene.h"
 #include "GlobalConstants.h"
+#include "BoltManager.h"
 
 class MainScene final : public GameScene {
 public:
@@ -32,9 +33,9 @@ private:
     Motor m_characterTranslation{ 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
     uint32_t m_characterMeshId{};
     float m_movementSpeed{ 60.f }; // units/s
-    TriVector m_gunSocket{ -m_capsuleColliderRadius, 0.75f * m_capsuleColliderHeight, 0.f};
+    TriVector m_gunSocket{ - 0.5f * m_capsuleColliderRadius, 0.75f * m_capsuleColliderHeight, 0.f};
     BiVector m_characterInitialDirection{ -zAxis };
-    TriVector boltA{}, boltB{};
+    std::unique_ptr<Bolt> m_pBolt{};
 
     // Enemy
     std::string const m_enemyMeshName{ "enemy" };
@@ -58,7 +59,6 @@ private:
     TriVector GetCharacterOrigin() const;
     Motor GetCharacterDirection() const;
     Motor GetCharacterRotation() const;
-    TriVector GetGunSocket() const;
     void Shoot();
     // Enemy
     void AddEnemy();
