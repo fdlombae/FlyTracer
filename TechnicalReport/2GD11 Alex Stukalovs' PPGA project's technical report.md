@@ -90,13 +90,17 @@ $1)\;Finding\;distance\;and\;proceed\;if\;it's\;larger\;than\;sum\;of\;radii$
 $$dist=|E\lor C|,$$
 $$dist > r_E + r_C =>proceed$$
 $2)\;Determining\;translation\;vectors$
-$$dir_B = normalize(P(E) \wedge P(C) \lor e_{123}),$$
+$$dir_B = normalize(P(E) \wedge P(C) \lor e_{123}), - see\;Figure\;3\;for\; visualization$$
 $$translationDist = dist - (r_E + r_C),$$
 $$translation_B = dir_B\;translationDist$$
 $$translation_A=-translation_B,$$
 $3)\;Calculating\;translation\;motors$
 $$T_A = 1 - \frac{1}{2} translation_A (-e_0),$$
 $$T_B = 1 - \frac{1}{2} translation_B (-e_0) - solution$$
+
+<img src="DirectionPlane.png" style="width: 100%; height: 100%;" />
+
+$$ Figure\;3.\;Distance\;plane\;visualization$$
 
 ## Enemy rotation
 Logic for rotating enemies towards the player.
