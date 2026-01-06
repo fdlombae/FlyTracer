@@ -25,14 +25,16 @@ private:
     float m_cursorX{}, m_cursorY{};
 
     float m_capsuleScale{ 5.f };
-    float m_capsuleColliderRadius{ 3.f }, m_capsuleColliderHeight{ 6.f };
+    float m_capsuleColliderRadius{ 3.f }, m_capsuleColliderHeight{ 10.f };
     // Character
     std::string const m_characterMeshName{ "character" };
-    float  m_characterYaw{};// Set to camera's yaw when character is moved
+    float  m_characterYawRadians{};// Set to camera's yaw when character is moved
     Motor m_characterTranslation{ 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
     uint32_t m_characterMeshId{};
     float m_movementSpeed{ 60.f }; // units/s
-    TriVector m_GunSocket{ m_capsuleColliderRadius, 0.5f * m_capsuleColliderHeight, 0.f};
+    TriVector m_gunSocket{ -m_capsuleColliderRadius, 0.75f * m_capsuleColliderHeight, 0.f};
+    BiVector m_characterInitialDirection{ -zAxis };
+    TriVector boltA{}, boltB{};
 
     // Enemy
     std::string const m_enemyMeshName{ "enemy" };
@@ -54,6 +56,9 @@ private:
     bool ResolveWallCollisions(T const& collider, const std::function<void(Motor const&)>& sink);
     // Character
     TriVector GetCharacterOrigin() const;
+    Motor GetCharacterDirection() const;
+    Motor GetCharacterRotation() const;
+    TriVector GetGunSocket() const;
     void Shoot();
     // Enemy
     void AddEnemy();
@@ -62,9 +67,6 @@ private:
     void RotateEnemy();
     TriVector GetEnemyOrigin() const;
     void UpdateEnemyMeshTransform();
-
-    static float GetSign(float value);
-    static float GetEuclideanSign(BiVector const& biVector);
 };
 
 template <Collider T>

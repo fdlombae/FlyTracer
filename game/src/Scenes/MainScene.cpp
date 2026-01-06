@@ -7,6 +7,7 @@
 #include "imgui.h"
 #include "FlyTracer.h"
 #include "SDL3/SDL.h"
+#include "Utils.h"
 
 MainScene::MainScene(const std::string& resourceDir)
     : GameScene(resourceDir) {
@@ -61,6 +62,8 @@ void MainScene::OnUpdate(float const deltaSec) {
     RotateEnemy();
     UpdateEnemyMeshTransform();
     ResolveCharacterEnemyCollisions();
+
+    DrawDebugLine(boltA, boltB);
 }
 
 void MainScene::OnInput(const InputState& input) {
@@ -114,7 +117,9 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
     direction /= direction.VNorm();// Normalizing vanishing part to prevent speed increase when moving diagonally
     float const speed{ m_movementSpeed * deltaSec };
 
-    Motor const R{ Motor::Rotation(m_cameraYaw * RAD_TO_DEG + 180.f, yAxis) };
+    // Rotating character in the movement idrection
+    m_characterYawRadians = m_cameraYaw + std::numbers::pi;
+    Motor const R{ GetCharacterRotation() };
     direction = (R * direction * ~R).Grade2();// Making character move along its local axes
     // NOTE: Dividing by 2, because bireflection doubles the distance
     Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
@@ -162,9 +167,36 @@ TriVector MainScene::GetCharacterOrigin() const
     return (m_characterTranslation * TriVector{0.f,  0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized();
 }
 
+Motor MainScene::GetCharacterDirection() const
+{
+    Motor const R{ GetCharacterRotation() };
+    return R * m_characterInitialDirection * ~R;
+}
+
+Motor MainScene::GetCharacterRotation() const
+{
+    return Motor::Rotation(m_characterYawRadians * RAD_TO_DEG, yAxis);
+}
+
+
 void MainScene::Shoot()
 {
-    std::cout << "Shooting" << std::endl;
+    // Getting gun socket
+    Motor const characterRotation{ GetCharacterRotation() };
+    TriVector gunSocket{ (characterRotation * m_gunSocket * ~characterRotation).Grade3() };
+    gunSocket = (~m_characterTranslation * gunSocket * m_characterTranslation).Grade3();
+
+    // Getting trajectory
+    Motor const gunPointOffset{ 1.f, gunSocket.e032(), gunSocket.e013(), gunSocket.e021(), 0.f, 0.f, 0.f, 0.f };
+    BiVector const trajectory{ (gunPointOffset * GetCharacterDirection() * ~gunPointOffset).Grade2().Normalized() };
+
+    // Creating bolt
+    static constexpr float boltLength{ 2.f };
+    TriVector const A{ gunSocket },
+    B{ OffsetPointAlongLine(A, trajectory, boltLength) };
+
+    boltA = A;
+    boltB = B;
 }
 
 void MainScene::OnGui()
@@ -176,6 +208,8 @@ void MainScene::OnGui()
     ImGui::Begin("Main Scene");
     ImGui::Text("Mouse location: %.1f, %.1f", x, y);
     ImGui::End();
+
+    RenderDebugDraw();// Rendering blaster bolts
 }
 
 void MainScene::AddEnemy()
@@ -236,16 +270,3 @@ void MainScene::UpdateEnemyMeshTransform()
     }
 }
 
-float MainScene::GetSign(float const value)
-{
-    float const denominator{ std::abs(value) < SDL_FLT_EPSILON ? 1.f : std::abs(value) };
-    return value / denominator;
-}
-
-float MainScene::GetEuclideanSign(BiVector const& biVector)
-{
-    float const a{ std::abs(biVector.e23()) < SDL_FLT_EPSILON ? 1.f : biVector.e23() },
-        b{ std::abs(biVector.e31()) < SDL_FLT_EPSILON ? 1.f : biVector.e31() },
-        c{ std::abs(biVector.e12()) < SDL_FLT_EPSILON ? 1.f : biVector.e12()  };
-    return GetSign(a*b*c);
-}
