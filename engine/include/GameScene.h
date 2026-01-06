@@ -132,7 +132,6 @@ public:
     void SetDebugDrawEnabled(bool enabled) { m_debugDrawEnabled = enabled; }
     [[nodiscard]] bool IsDebugDrawEnabled() const { return m_debugDrawEnabled; }
 
-protected:
     uint32_t LoadMesh(std::string_view objFilename, std::string_view textureFilename = {});
 
     void FreeMeshCPUData(uint32_t meshId);
@@ -192,6 +191,7 @@ protected:
     void DrawDebugLine(const BiVector& line, float halfLength = 10.0f,
                        const Scene::Color& color = Scene::Color::White());
 
+protected:
     std::string m_resourceDir;
     Scene::SceneData m_sceneData;
 

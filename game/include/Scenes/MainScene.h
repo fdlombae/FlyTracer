@@ -5,6 +5,7 @@
 #include "GameScene.h"
 #include "GlobalConstants.h"
 #include "BoltManager.h"
+#include "EnemyManager.h"
 
 class MainScene final : public GameScene {
 public:
@@ -25,24 +26,18 @@ private:
 
     float m_cursorX{}, m_cursorY{};
 
-    float m_capsuleScale{ 5.f };
-    float m_capsuleColliderRadius{ 3.f }, m_capsuleColliderHeight{ 10.f };
     // Character
     std::string const m_characterMeshName{ "character" };
     float  m_characterYawRadians{};// Set to camera's yaw when character is moved
     Motor m_characterTranslation{ 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
     uint32_t m_characterMeshId{};
     float m_movementSpeed{ 60.f }; // units/s
-    TriVector m_gunSocket{ - 0.5f * m_capsuleColliderRadius, 0.75f * m_capsuleColliderHeight, 0.f};
+    TriVector m_gunSocket{ - 0.5f * capsuleColliderRadius, 0.75f * capsuleColliderHeight, 0.f};
     BiVector m_characterInitialDirection{ -zAxis };
     BoltManager m_boltManager;
 
-    // Enemy
-    std::string const m_enemyMeshName{ "enemy" };
-    uint32_t m_enemyMeshId{};
-    MeshInstance* m_pEnemyMesh{};
-    Motor m_enemyTranslation{/*Set in OnInit()*/}, m_enemyRotation{ Motor::Rotation(0.f, yAxis) };
-    BiVector m_enemyInitialDirection{ zAxis };
+    // Enemies
+    EnemyManager m_EnemyManager;
 
     void OnGui() override;
 
@@ -52,7 +47,7 @@ private:
     // Return if there were collisions
     bool ResolveCameraCollisions();
     bool ResolveCharacterPlaneCollisions();
-    bool ResolveCharacterEnemyCollisions();
+    //bool ResolveCharacterEnemyCollisions();
     template <Collider T>
     bool ResolveWallCollisions(T const& collider, const std::function<void(Motor const&)>& sink);
     // Character
@@ -60,13 +55,6 @@ private:
     Motor GetCharacterDirection() const;
     Motor GetCharacterRotation() const;
     void Shoot();
-    // Enemy
-    void AddEnemy();
-    // Updates m_enemyTranslation, but does not affect m_enemyRotation.
-    // Call UpdateEnemyMeshTransform() to update the mesh.
-    void RotateEnemy();
-    TriVector GetEnemyOrigin() const;
-    void UpdateEnemyMeshTransform();
 };
 
 template <Collider T>

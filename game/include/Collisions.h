@@ -21,6 +21,9 @@ struct Capsule
     TriVector GetBottomSphereOrigin() const;
 };
 
+// Pre-set values for both enemy and player character colliders
+float constexpr capsuleScale{ 5.f }, capsuleColliderRadius{ 3.f }, capsuleColliderHeight{ 10.f };
+
 template<typename T>
 concept Collider = std::is_same_v<T, Sphere> || std::is_same_v<T, Capsule>;
 

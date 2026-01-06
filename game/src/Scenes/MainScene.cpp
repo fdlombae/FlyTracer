@@ -1,8 +1,7 @@
-#include "Scenes/MainScene.h"
 #include <algorithm>
 #include <cmath>
-#include <concepts>
 
+#include "Scenes/MainScene.h"
 #include "Collisions.h"
 #include "imgui.h"
 #include "FlyTracer.h"
@@ -10,7 +9,9 @@
 #include "Utils.h"
 
 MainScene::MainScene(const std::string& resourceDir)
-    : GameScene(resourceDir) {
+    : GameScene(resourceDir)
+    , m_EnemyManager(*this)
+{
 }
 
 void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
@@ -38,9 +39,12 @@ void MainScene::OnInit([[maybe_unused]] VulkanRenderer* renderer) {
     AddMeshInstance(m_characterMeshId, TriVector(0.f, 0.f, 0.f), m_characterMeshName);
     if (MeshInstance* pCharacterMesh = FindInstance(m_characterMeshName); pCharacterMesh)
     {
-        pCharacterMesh->scale = m_capsuleScale;
+        pCharacterMesh->scale = capsuleScale;
     }
-    AddEnemy();
+
+    m_EnemyManager.AddEnemy({0.f, 0.f, 50.f});
+    m_EnemyManager.AddEnemy({10.f, 0.f, 100.f});
+    m_EnemyManager.AddEnemy({-25.f, 0.f, 175.f});
 
     // Point lights
     for (int lightIdx{}; lightIdx < 10; ++lightIdx) {
@@ -59,9 +63,7 @@ void MainScene::OnUpdate(float const deltaSec) {
     UpdateFPS(deltaSec);
     ProcessCharacterMovement(deltaSec);
     ResolveCharacterPlaneCollisions();
-    RotateEnemy();
-    UpdateEnemyMeshTransform();
-    ResolveCharacterEnemyCollisions();
+    m_EnemyManager.Update(deltaSec, GetCharacterOrigin());
 
     m_boltManager.Update(deltaSec);
     // Drawing bolts
@@ -146,26 +148,9 @@ bool MainScene::ResolveCameraCollisions() {
 bool MainScene::ResolveCharacterPlaneCollisions()
 {
     return ResolveWallCollisions(
-        Capsule( GetCharacterOrigin(), m_capsuleColliderRadius, m_capsuleColliderHeight ),
+        Capsule( GetCharacterOrigin(), capsuleColliderRadius, capsuleColliderHeight ),
         [this](Motor const& T){ m_characterTranslation = T * m_characterTranslation; }
         );
-}
-
-bool MainScene::ResolveCharacterEnemyCollisions()
-{
-    // 1. Getting bottom spheres
-    Sphere const enemyBottomSphere{ Capsule(GetEnemyOrigin(),  m_capsuleColliderRadius, m_capsuleColliderHeight).GetBottomSphereOrigin(), m_capsuleColliderRadius };
-    Sphere const characterBottomSphere{ Capsule(GetCharacterOrigin(),  m_capsuleColliderRadius, m_capsuleColliderHeight).GetBottomSphereOrigin(), m_capsuleColliderRadius };
-    // 2. Handling sphere collision
-    if (auto const translations{ ProcessCollision(enemyBottomSphere, characterBottomSphere) };
-        translations.has_value())
-    {
-        // 3. Resolving the collision
-        m_enemyTranslation = translations.value().first * m_enemyTranslation;
-        m_characterTranslation = translations.value().second * m_characterTranslation;
-        return true;
-    }
-    return false;
 }
 
 TriVector MainScene::GetCharacterOrigin() const
@@ -213,60 +198,3 @@ void MainScene::OnGui()
     RenderDebugDraw();// Rendering blaster bolts
 }
 
-void MainScene::AddEnemy()
-{
-    m_enemyMeshId = LoadMesh("capsule.obj", "capsule.png");
-    AddMeshInstance(m_enemyMeshId, TriVector(0.f, 0.f, 20.f), "enemy");
-    if (MeshInstance* pEnemyMesh = FindInstance(m_enemyMeshName); pEnemyMesh)
-    {
-        pEnemyMesh->scale = m_capsuleScale;
-        m_enemyTranslation = pEnemyMesh->transform;
-    }
-}
-
-void MainScene::RotateEnemy()
-{
-    // 1. Retrieving character and enemy origins, and enemy view direction
-    TriVector const characterOrigin{ GetCharacterOrigin().Normalized() },
-        enemyOrigin{ GetEnemyOrigin().Normalized() };
-    BiVector const enemyViewDirection{ (m_enemyRotation * m_enemyInitialDirection * ~m_enemyRotation).Grade2().Normalized() };
-
-    // 2. Calculating final enemy's direction
-    BiVector const finalEnemyViewDirection{ (enemyOrigin & characterOrigin).Normalized() };
-
-    // 3. Getting the angle between direction vectors
-    // 3.1. Getting cos of the angle between the direction vectors
-    // NOTE: enemyViewDirection and finalEnemyViewDirection are normalized, so there's no need to divide by the product of norms
-    float cos{ (enemyViewDirection | finalEnemyViewDirection) };
-
-    // Clamping dot to [-1, 1], because std::acos will result in NaN outside of it
-    // NOTE: The value can get outside of this range due to floating point precision errors
-    if (cos < -1) cos = -1;
-    else if (cos > 1) cos = 1;
-
-    // 3.2. Getting sin of the angle between the direction vectors
-    // NOTE: Not using meet directly, because that alone will result in void
-    BiVector const wedge{(enemyViewDirection * finalEnemyViewDirection).Grade2()};
-    float const sin{ GetEuclideanSign(wedge) * wedge.Norm() };
-
-    // 3.3. Finding the angle
-    float const directionRadians{ std::atan2(sin, cos) };
-
-    // 4. Creating rotation motor and applying it to the enemy's mesh
-    Motor const R{ Motor::Rotation(directionRadians * RAD_TO_DEG, yAxis) };
-    m_enemyRotation = R * m_enemyRotation;
-
-}
-
-TriVector MainScene::GetEnemyOrigin() const
-{
-    return (m_enemyTranslation * TriVector{0.f,  0.f, 0.f} * ~m_enemyTranslation).Grade3().Normalized();
-}
-
-void MainScene::UpdateEnemyMeshTransform()
-{
-    if (MeshInstance* pEnemyMesh = FindInstance(m_enemyMeshName); pEnemyMesh)
-    {
-        pEnemyMesh->transform = m_enemyRotation * m_enemyTranslation;
-    }
-}
