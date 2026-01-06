@@ -21,7 +21,7 @@ private:
     float m_accumulatedDistance{};
 };
 
-class BoltManager
+class Bolts
 {
 public:
     void AddBolt(Bolt const&);

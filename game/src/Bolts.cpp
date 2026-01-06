@@ -1,4 +1,4 @@
-#include "BoltManager.h"
+#include "Bolts.h"
 
 #include <algorithm>
 
@@ -34,17 +34,17 @@ float Bolt::GetAccumulatedDistance() const
 ///////////////////////////////////////////////////////////////////////////
 /// Bolt manager
 ///////////////////////////////////////////////////////////////////////////
-void BoltManager::AddBolt(Bolt const& bolt)
+void Bolts::AddBolt(Bolt const& bolt)
 {
     m_bolts.push_back(bolt);
 }
 
-std::vector<Bolt> const& BoltManager::GetBolts() const
+std::vector<Bolt> const& Bolts::GetBolts() const
 {
     return m_bolts;
 }
 
-void BoltManager::Update(float const deltaSec)
+void Bolts::Update(float const deltaSec)
 {
     // Updating bolts
     for (Bolt& bolt : m_bolts)

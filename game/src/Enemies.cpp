@@ -1,4 +1,4 @@
-#include "EnemyManager.h"
+#include "Enemies.h"
 
 #include "GameScene.h"
 #include "Collisions.h"
@@ -79,12 +79,12 @@ void Enemy::ResolveCharacterCollision(TriVector const& characterOrigin)
 ///////////////////////////////////////////////////////////////////////////
 /// Enemy manager
 ///////////////////////////////////////////////////////////////////////////
-EnemyManager::EnemyManager(GameScene& scene)
+Enemies::Enemies(GameScene& scene)
     : m_scene(scene)
 {}
 
 
-void EnemyManager::AddEnemy(TriVector const& position)
+void Enemies::AddEnemy(TriVector const& position)
 {
     std::string enemyMeshName{ "enemy" + std::to_string(m_enemies.size()) };
     uint32_t const enemyMeshId{ m_scene.LoadMesh("capsule.obj", "capsule.png") };// TODO: Make common for all enemies
@@ -96,7 +96,7 @@ void EnemyManager::AddEnemy(TriVector const& position)
     }
 }
 
-void EnemyManager::Update([[maybe_unused]] float deltaSec, TriVector const& characterOrigin)
+void Enemies::Update([[maybe_unused]] float deltaSec, TriVector const& characterOrigin)
 {
     for (Enemy& enemy : m_enemies)
     {

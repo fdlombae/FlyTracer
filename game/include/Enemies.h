@@ -25,10 +25,10 @@ private:
 
 };
 
-class EnemyManager
+class Enemies
 {
 public:
-    explicit EnemyManager(GameScene& scene);
+    explicit Enemies(GameScene& scene);
     void AddEnemy(TriVector const& position);
     void Update(float deltaSec, TriVector const& characterOrigin);
 

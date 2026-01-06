@@ -4,8 +4,8 @@
 #include "Collisions.h"
 #include "GameScene.h"
 #include "GlobalConstants.h"
-#include "BoltManager.h"
-#include "EnemyManager.h"
+#include "Bolts.h"
+#include "Enemies.h"
 
 class MainScene final : public GameScene {
 public:
@@ -34,10 +34,10 @@ private:
     float m_movementSpeed{ 60.f }; // units/s
     TriVector m_gunSocket{ - 0.5f * capsuleColliderRadius, 0.75f * capsuleColliderHeight, 0.f};
     BiVector m_characterInitialDirection{ -zAxis };
-    BoltManager m_boltManager;
+    Bolts m_boltManager;
 
     // Enemies
-    EnemyManager m_EnemyManager;
+    Enemies m_EnemyManager;
 
     void OnGui() override;
 
