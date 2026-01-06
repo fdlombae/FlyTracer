@@ -63,10 +63,11 @@ void MainScene::OnUpdate(float const deltaSec) {
     UpdateEnemyMeshTransform();
     ResolveCharacterEnemyCollisions();
 
-    if (m_pBolt)
+    m_boltManager.Update(deltaSec);
+    // Drawing bolts
+    for (Bolt const& bolt : m_boltManager.GetBolts())
     {
-        m_pBolt->Update(deltaSec);
-        auto const[A, B]{ m_pBolt->GetPoints() };
+        auto const[A, B]{ bolt.GetPoints() };
         DrawDebugLine(A, B);
     }
 }
@@ -196,7 +197,7 @@ void MainScene::Shoot()
     BiVector const trajectory{ (gunPointOffset * GetCharacterDirection() * ~gunPointOffset).Grade2().Normalized() };
 
     // Creating bolt
-    m_pBolt = std::make_unique<Bolt>(gunSocket, trajectory);
+    m_boltManager.AddBolt({gunSocket, trajectory});
 }
 
 void MainScene::OnGui()

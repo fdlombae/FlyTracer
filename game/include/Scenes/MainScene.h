@@ -35,7 +35,7 @@ private:
     float m_movementSpeed{ 60.f }; // units/s
     TriVector m_gunSocket{ - 0.5f * m_capsuleColliderRadius, 0.75f * m_capsuleColliderHeight, 0.f};
     BiVector m_characterInitialDirection{ -zAxis };
-    std::unique_ptr<Bolt> m_pBolt{};
+    BoltManager m_boltManager;
 
     // Enemy
     std::string const m_enemyMeshName{ "enemy" };
