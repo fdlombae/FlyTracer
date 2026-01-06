@@ -24,10 +24,11 @@ struct Capsule
 template<typename T>
 concept Collider = std::is_same_v<T, Sphere> || std::is_same_v<T, Capsule>;
 
-// NOTE: Wall is an immutable plane, meaning that it cannot be moved, only the sphere can.
-// @return Whether there was a collision
-std::optional<Motor> ProcessCollision(Sphere const&, Vector const& wall);
-std::optional<Motor> ProcessCollision(Capsule const&, Vector const& wall);
-
+// NOTE: Wall is an immutable plane, meaning that it cannot be moved, only the sphere can
+// @return Motor by which to move the collider or std::nullopt if no collision
+std::optional<Motor> ProcessWallCollision(Sphere const&, Vector const& wall);
+std::optional<Motor> ProcessWallCollision(Capsule const&, Vector const& wall);
+// @return Translation motors for spheres given in the same order as input
+std::optional<std::pair<Motor, Motor>> ProcessCollision(Sphere const&, Sphere const&);
 
 #endif

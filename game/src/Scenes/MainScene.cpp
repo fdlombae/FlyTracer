@@ -60,6 +60,7 @@ void MainScene::OnUpdate(float const deltaSec) {
     ResolveCharacterPlaneCollisions();
     RotateEnemy();
     UpdateEnemyMeshTransform();
+    ResolveCharacterEnemyCollisions();
 }
 
 void MainScene::OnInput(const InputState& input) {
@@ -108,7 +109,7 @@ void MainScene::ProcessCharacterMovement(float const deltaSec) {
     direction /= direction.VNorm();// Normalizing vanishing part to prevent speed increase when moving diagonally
     float const speed{ m_movementSpeed * deltaSec };
 
-    Motor const R{ Motor::Rotation(m_cameraYaw * RAD_TO_DEG + 180.f, m_yAxis) };
+    Motor const R{ Motor::Rotation(m_cameraYaw * RAD_TO_DEG + 180.f, yAxis) };
     direction = (R * direction * ~R).Grade2();// Making character move along its local axes
     // NOTE: Dividing by 2, because bireflection doubles the distance
     Motor const T{1.f, direction.e01() * speed * 0.5f, 0.f, direction.e03() * speed * 0.5f, 0.f, 0.f, 0.f, 0.f};
@@ -136,7 +137,18 @@ bool MainScene::ResolveCharacterPlaneCollisions()
 
 bool MainScene::ResolveCharacterEnemyCollisions()
 {
-    TriVector const enemyOrigin{ GetEnemyOrigin() }, characterOrigin{ GetCharacterOrigin() };
+    // 1. Getting bottom spheres
+    Sphere const enemyBottomSphere{ Capsule(GetEnemyOrigin(),  m_capsuleColliderRadius, m_capsuleColliderHeight).GetBottomSphereOrigin(), m_capsuleColliderRadius };
+    Sphere const characterBottomSphere{ Capsule(GetCharacterOrigin(),  m_capsuleColliderRadius, m_capsuleColliderHeight).GetBottomSphereOrigin(), m_capsuleColliderRadius };
+    // 2. Handling sphere collision
+    if (auto const translations{ ProcessCollision(enemyBottomSphere, characterBottomSphere) };
+        translations.has_value())
+    {
+        // 3. Resolving the collision
+        m_enemyTranslation = translations.value().first * m_enemyTranslation;
+        m_characterTranslation = translations.value().second * m_characterTranslation;
+        return true;
+    }
     return false;
 }
 
@@ -196,7 +208,7 @@ void MainScene::RotateEnemy()
     float const directionRadians{ std::atan2(sin, cos) };
 
     // 4. Creating rotation motor and applying it to the enemy's mesh
-    Motor const R{ Motor::Rotation(directionRadians * RAD_TO_DEG, m_yAxis) };
+    Motor const R{ Motor::Rotation(directionRadians * RAD_TO_DEG, yAxis) };
     m_enemyRotation = R * m_enemyRotation;
 
 }

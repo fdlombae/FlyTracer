@@ -3,6 +3,7 @@
 
 #include "Collisions.h"
 #include "GameScene.h"
+#include "GlobalConstants.h"
 
 class MainScene final : public GameScene {
 public:
@@ -13,9 +14,6 @@ public:
     void OnInput(const InputState& input) override;
 
 private:
-    BiVector const m_yAxis{0.f, 0.f, 0.f, 0.f, 1.f, 0.f}/*e31*/,
-        m_zAxis{0.f, 0.f, 0.f, 0.f, 0.f, 1.f}/*e12*/;
-
     // Camera orbit
     float m_cameraYaw{-0.75f};
     float m_cameraPitch{-.1f};
@@ -38,8 +36,8 @@ private:
     uint32_t m_enemyMeshId{};
     TriVector m_GunSocket{ m_capsuleColliderRadius, 0.5f * m_capsuleColliderHeight, 0.f};
     MeshInstance* m_pEnemyMesh{};
-    Motor m_enemyTranslation{/*Set in OnInit()*/}, m_enemyRotation{ Motor::Rotation(0.f, m_yAxis) };
-    BiVector m_enemyInitialDirection{ m_zAxis };
+    Motor m_enemyTranslation{/*Set in OnInit()*/}, m_enemyRotation{ Motor::Rotation(0.f, yAxis) };
+    BiVector m_enemyInitialDirection{ zAxis };
 
     void OnGui() override;
 
@@ -51,7 +49,7 @@ private:
     bool ResolveCharacterPlaneCollisions();
     bool ResolveCharacterEnemyCollisions();
     template <Collider T>
-    bool ResolveWallCollisions(T const& collider, std::function<void(Motor const&)> sink);
+    bool ResolveWallCollisions(T const& collider, const std::function<void(Motor const&)>& sink);
         // Character
     TriVector GetCharacterTopSphereOrigin() const;
     TriVector GetCharacterBottomSphereOrigin() const;
@@ -69,12 +67,12 @@ private:
 };
 
 template <Collider T>
-bool MainScene::ResolveWallCollisions(T const& collider, std::function<void(Motor const&)> const sink)
+bool MainScene::ResolveWallCollisions(T const& collider, std::function<void(Motor const&)> const& sink)
 {
     bool hasCollision{};
     for (Scene::GPUPlane const& gpuPlane : m_sceneData.planes)
     {
-        if (auto const transform{ ProcessCollision(collider, gpuPlane.GetPlane())};
+        if (auto const transform{ ProcessWallCollision(collider, gpuPlane.GetPlane())};
             transform.has_value())
         {
             sink(transform.value());
