@@ -75,6 +75,11 @@ void MainScene::OnInput(const InputState& input) {
 
 }
 
+void MainScene::OnLMBUp()
+{
+    Shoot();
+}
+
 void MainScene::ProcessCameraMovement(InputState const &input) {
     float cursorX, cursorY;
     SDL_GetMouseState(&cursorX, &cursorY);
@@ -157,6 +162,11 @@ TriVector MainScene::GetCharacterOrigin() const
     return (m_characterTranslation * TriVector{0.f,  0.f, 0.f} * ~m_characterTranslation).Grade3().Normalized();
 }
 
+void MainScene::Shoot()
+{
+    std::cout << "Shooting" << std::endl;
+}
+
 void MainScene::OnGui()
 {
     RenderDebugDraw();
@@ -226,13 +236,13 @@ void MainScene::UpdateEnemyMeshTransform()
     }
 }
 
-float MainScene::GetSign(float const value) const
+float MainScene::GetSign(float const value)
 {
     float const denominator{ std::abs(value) < SDL_FLT_EPSILON ? 1.f : std::abs(value) };
     return value / denominator;
 }
 
-float MainScene::GetEuclideanSign(BiVector const& biVector) const
+float MainScene::GetEuclideanSign(BiVector const& biVector)
 {
     float const a{ std::abs(biVector.e23()) < SDL_FLT_EPSILON ? 1.f : biVector.e23() },
         b{ std::abs(biVector.e31()) < SDL_FLT_EPSILON ? 1.f : biVector.e31() },

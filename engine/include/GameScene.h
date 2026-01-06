@@ -90,6 +90,7 @@ public:
     virtual void OnInput(const InputState& input);
     virtual void OnGui();
     virtual void OnShutdown();
+    virtual void OnLMBUp(){};
 
     [[nodiscard]] Scene::SceneData& GetSceneData() noexcept { return m_sceneData; }
     [[nodiscard]] const Scene::SceneData& GetSceneData() const noexcept { return m_sceneData; }

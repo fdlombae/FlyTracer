@@ -227,7 +227,11 @@ void Application::handleEvents() {
         } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
             if (event.button.button == SDL_BUTTON_RIGHT) m_rightMouseDown = false;
             else if (event.button.button == SDL_BUTTON_MIDDLE) m_middleMouseDown = false;
-            else if (event.button.button == SDL_BUTTON_LEFT) m_leftMouseDown = false;
+            else if (event.button.button == SDL_BUTTON_LEFT)
+            {
+                m_leftMouseDown = false;
+                m_gameScene->OnLMBUp();
+            }
         } else if (event.type == SDL_EVENT_MOUSE_MOTION && !imguiWantsMouse) {
             // Accumulate mouse delta for scene input
             m_mouseDeltaX += event.motion.x - m_lastMouseX;

@@ -12,6 +12,7 @@ public:
     void OnInit(VulkanRenderer* renderer) override;
     void OnUpdate(float deltaSec) override;
     void OnInput(const InputState& input) override;
+    void OnLMBUp() override;
 
 private:
     // Camera orbit
@@ -31,10 +32,11 @@ private:
     Motor m_characterTranslation{ 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
     uint32_t m_characterMeshId{};
     float m_movementSpeed{ 60.f }; // units/s
+    TriVector m_GunSocket{ m_capsuleColliderRadius, 0.5f * m_capsuleColliderHeight, 0.f};
+
     // Enemy
     std::string const m_enemyMeshName{ "enemy" };
     uint32_t m_enemyMeshId{};
-    TriVector m_GunSocket{ m_capsuleColliderRadius, 0.5f * m_capsuleColliderHeight, 0.f};
     MeshInstance* m_pEnemyMesh{};
     Motor m_enemyTranslation{/*Set in OnInit()*/}, m_enemyRotation{ Motor::Rotation(0.f, yAxis) };
     BiVector m_enemyInitialDirection{ zAxis };
@@ -50,10 +52,9 @@ private:
     bool ResolveCharacterEnemyCollisions();
     template <Collider T>
     bool ResolveWallCollisions(T const& collider, const std::function<void(Motor const&)>& sink);
-        // Character
-    TriVector GetCharacterTopSphereOrigin() const;
-    TriVector GetCharacterBottomSphereOrigin() const;
+    // Character
     TriVector GetCharacterOrigin() const;
+    void Shoot();
     // Enemy
     void AddEnemy();
     // Updates m_enemyTranslation, but does not affect m_enemyRotation.
@@ -62,8 +63,8 @@ private:
     TriVector GetEnemyOrigin() const;
     void UpdateEnemyMeshTransform();
 
-    float GetSign(float value) const;
-    float GetEuclideanSign(BiVector const&) const;
+    static float GetSign(float value);
+    static float GetEuclideanSign(BiVector const& biVector);
 };
 
 template <Collider T>
