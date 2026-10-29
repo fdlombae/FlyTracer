@@ -1,6 +1,5 @@
 # This file uses centimeters as units for non-parametric coordinates.
 
-mtllib PheasantsRingNecked.mtl
 g default
 v 0.648272 10.354844 2.733977
 v 0.609071 10.329603 2.765589
@@ -5539,7 +5538,6 @@ vn 0.844799 0.531308 -0.063460
 vn 0.844799 0.531308 -0.063460
 s off
 g PheasantsRingNecked_mesh
-usemtl PheasantsRingNecked_mat
 f 1/1/1 21/2/2 20/3/3 2/1179/4
 f 10/5/5 5/6/6 6/1189/7 11/1188/8
 f 18/9/9 7/10/10 8/11/11 19/1186/12

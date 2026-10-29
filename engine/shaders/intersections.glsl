@@ -1,140 +1,93 @@
-// Ray intersection functions - Classic ray tracing formulas
-// No PGA - uses conventional vector math
+// Ray-primitive intersections in PGA. They return true for a hit in (0, tMax) and write its distance,
+// in units of the ray's direction, to t.
 
 #ifndef INTERSECTIONS_GLSL
 #define INTERSECTIONS_GLSL
 
-// Ray-Triangle intersection using Moller-Trumbore algorithm
-bool intersectTriangle(Ray ray, vec3 v0, vec3 v1, vec3 v2, inout float t, inout vec3 barycoord) {
-    vec3 edge1 = v1 - v0;
-    vec3 edge2 = v2 - v0;
-    vec3 h = cross(ray.direction, edge2);
-    float a = dot(edge1, h);
-
-    if (abs(a) < EPSILON)
-        return false;
-
-    float f = 1.0 / a;
-    vec3 s = ray.origin - v0;
-    float u = f * dot(s, h);
-
-    if (u < 0.0 || u > 1.0)
-        return false;
-
-    vec3 q = cross(s, edge1);
-    float v = f * dot(ray.direction, q);
-
-    if (v < 0.0 || u + v > 1.0)
-        return false;
-
-    float tHit = f * dot(edge2, q);
-
-    if (tHit > EPSILON && tHit < t) {
-        t = tHit;
-        barycoord = vec3(1.0 - u - v, u, v);
-        return true;
-    }
-
-    return false;
+// With the sphere's center as the origin, the ray's line passes it at the distance
+// |moment| / |direction|. The point of the line closest to the center lies in the plane through the
+// center perpendicular to the line; the ray enters and leaves half a chord before and after it.
+bool chordOfSphere(Ray ray, vec3 center, float radius, out float closest, out float halfChord) {
+    Ray local = relativeTo(ray, center);
+    BiVector line = join(local.origin, local.direction);
+    float directionSquared = dot(line.direction, line.direction);
+    float distanceSquared = dot(line.moment, line.moment) / directionSquared;
+    if (distanceSquared > radius * radius) return false;
+    closest = rayParameter(local, inner(point(vec3(0.0)), line));
+    halfChord = sqrt((radius * radius - distanceSquared) / directionSquared);
+    return true;
 }
 
-// Ray-Sphere intersection (optimized: ray.direction is pre-normalized, so a=1)
-bool intersectSphere(Ray ray, vec3 center, float radius, inout float t) {
-    vec3 oc = ray.origin - center;
-    // Since ray.direction is normalized, a = dot(d,d) = 1.0
-    // Simplified: b = 2*dot(oc, d), c = dot(oc,oc) - r^2
-    // Using half-b for efficiency: b' = dot(oc, d)
-    float half_b = dot(oc, ray.direction);
-    float c = dot(oc, oc) - radius * radius;
-    float discriminant = half_b * half_b - c;
-
-    if (discriminant < 0.0)
-        return false;
-
-    float sqrtD = sqrt(discriminant);
-    float t0 = -half_b - sqrtD;
-    float t1 = -half_b + sqrtD;
-
-    float tHit = t0;
-    if (tHit < EPSILON)
-        tHit = t1;
-
-    if (tHit > EPSILON && tHit < t) {
-        t = tHit;
-        return true;
-    }
-
-    return false;
+bool intersectSphere(Ray ray, vec3 center, float radius, float tMax, out float t) {
+    float closest;
+    float halfChord;
+    if (!chordOfSphere(ray, center, radius, closest, halfChord)) return false;
+    t = closest - halfChord;
+    if (t <= 0.0) t = closest + halfChord;  // Starting inside the sphere
+    return t > 0.0 && t < tMax;
 }
 
-// Ray-Plane intersection
-// Plane defined by: dot(normal, point) = distance
-bool intersectPlane(Ray ray, vec3 normal, float distance, inout float t) {
-    float denom = dot(normal, ray.direction);
-
-    if (abs(denom) < EPSILON)
-        return false;  // Ray parallel to plane
-
-    float tHit = (distance - dot(normal, ray.origin)) / denom;
-
-    if (tHit > EPSILON && tHit < t) {
-        t = tHit;
-        return true;
-    }
-
-    return false;
+bool intersectPlane(Ray ray, Vector plane, float tMax, out float t) {
+    t = rayParameter(ray, plane);  // Infinite or NaN when the ray runs parallel to the plane
+    return t > 0.0 && t < tMax;
 }
 
-// Ray-AABB intersection for BVH traversal
-// Uses safe inverse direction computation to handle near-zero components
-bool intersectAABB(Ray ray, vec3 minBounds, vec3 maxBounds, float tMax) {
-    // Compute safe inverse direction (use large value for near-zero components)
-    const float INV_DIR_EPSILON = 1e-8;
-    vec3 invDir;
-    invDir.x = (abs(ray.direction.x) > INV_DIR_EPSILON) ? (1.0 / ray.direction.x) : sign(ray.direction.x) * 1e8;
-    invDir.y = (abs(ray.direction.y) > INV_DIR_EPSILON) ? (1.0 / ray.direction.y) : sign(ray.direction.y) * 1e8;
-    invDir.z = (abs(ray.direction.z) > INV_DIR_EPSILON) ? (1.0 / ray.direction.z) : sign(ray.direction.z) * 1e8;
-
-    vec3 t0 = (minBounds - ray.origin) * invDir;
-    vec3 t1 = (maxBounds - ray.origin) * invDir;
-    vec3 tmin = min(t0, t1);
-    vec3 tmax = max(t0, t1);
-
-    float enter = max(max(tmin.x, tmin.y), tmin.z);
-    float exit = min(min(tmax.x, tmax.y), tmax.z);
-
-    return enter <= exit && exit >= 0.0 && enter < tMax;
+// Slab test. The ray meets the axis plane x = c, the plane e1 - c e0, at t = (c - origin.x) / direction.x,
+// and likewise for y and z; it is inside the box where it is between all three pairs of planes.
+float enterBox(Ray ray, vec3 inverseDirection, Box box, float tMax) {
+    vec3 t0 = (box.minimum - ray.origin.xyz) * inverseDirection;
+    vec3 t1 = (box.maximum - ray.origin.xyz) * inverseDirection;
+    vec3 tNear = min(t0, t1);
+    vec3 tFar = max(t0, t1);
+    float enter = max(max(tNear.x, tNear.y), max(tNear.z, 0.0));
+    float exit = min(min(tFar.x, tFar.y), tFar.z);
+    return (enter <= exit && enter < tMax) ? enter : INFINITY;
 }
 
-// Reflection direction
-vec3 reflectDirection(vec3 incident, vec3 normal) {
-    return incident - 2.0 * dot(incident, normal) * normal;
+// 1 / 0 is undefined in GLSL; a huge but finite inverse with the same sign gives the same slab test result
+vec3 inverseOf(TriVector direction) {
+    vec3 tiny = 1e-20 * (2.0 * step(0.0, direction.xyz) - 1.0);
+    return 1.0 / mix(direction.xyz, tiny, lessThan(abs(direction.xyz), vec3(1e-20)));
 }
 
-// Compute sphere UV coordinates
-vec2 computeSphereUV(vec3 hitPos, vec3 center) {
-    vec3 localPos = normalize(hitPos - center);
-    float u = 0.5 + atan(localPos.z, localPos.x) / (2.0 * PI);
-    float v = 0.5 - asin(clamp(localPos.y, -1.0, 1.0)) / PI;
-    return vec2(u, v);
+// The Plücker product of the ray's line with an edge's line, with the edge's anchor as the origin:
+//     join(join(point(origin - anchor), direction), BiVector(edge direction, no moment))
+// The edge has no moment there, so this is the ray's moment around the anchor along the edge.
+// Every triangle with this edge must get exactly the same number, which makes the test watertight,
+// so it is written out with precise: the compiler may not fuse its operations differently where
+// this function is inlined.
+float edgeProduct(Ray ray, uint edgeIndex) {
+    Edge edge = edges[edgeIndex & ~REVERSED_EDGE];
+    precise vec3 localOrigin = ray.origin.xyz - edge.anchor;
+    precise vec3 moment = cross(localOrigin, ray.direction.xyz);
+    precise float product = dot(moment, edge.direction);
+    return (edgeIndex & REVERSED_EDGE) != 0u ? -product : product;
 }
 
-// Compute plane UV coordinates (checkerboard-friendly)
-vec2 computePlaneUV(vec3 hitPos, vec3 normal, float tileScale) {
-    // Build tangent frame
-    vec3 tangent = abs(normal.y) < 0.999
-        ? normalize(cross(vec3(0.0, 1.0, 0.0), normal))
-        : normalize(cross(vec3(1.0, 0.0, 0.0), normal));
-    vec3 bitangent = cross(normal, tangent);
-
-    float u = dot(hitPos, tangent) * tileScale;
-    float v = dot(hitPos, bitangent) * tileScale;
-    return vec2(u, v);
+// The ray passes the two edges on different sides
+bool oppositeSigns(float a, float b) {
+    return (a < 0.0 && b > 0.0) || (a > 0.0 && b < 0.0);
 }
 
-// Checkerboard pattern
-float checkerboard(vec2 uv) {
-    return mod(floor(uv.x) + floor(uv.y), 2.0);
+// The ray passes through the triangle when its Plücker products with the three edges, all run
+// through in winding order, have the same sign. Each product is proportional to the barycentric
+// weight of the corner opposite its edge.
+bool intersectEdgeTriangle(Ray ray, EdgeTriangle triangle, float tMax, out float t, out vec2 barycentrics) {
+    float product0 = edgeProduct(ray, triangle.edges[0]);
+    float product1 = edgeProduct(ray, triangle.edges[1]);
+    if (oppositeSigns(product0, product1)) return false;
+    float product2 = edgeProduct(ray, triangle.edges[2]);
+    if (oppositeSigns(product0, product2) || oppositeSigns(product1, product2)) return false;
+    float sum = product0 + product1 + product2;
+    if (sum == 0.0) return false;  // In the triangle's plane
+
+    // The triangle's plane: through the anchor of edge 0, along its direction and that of edge 1
+    Edge edge0 = edges[triangle.edges[0] & ~REVERSED_EDGE];
+    Edge edge1 = edges[triangle.edges[1] & ~REVERSED_EDGE];
+    Vector plane = join(BiVector(edge0.direction, vec3(0.0)), direction(edge1.direction));
+    t = rayParameter(relativeTo(ray, edge0.anchor), plane);
+    barycentrics = vec2(product1, product2) / sum;
+    return t > 0.0 && t < tMax;
 }
 
 #endif // INTERSECTIONS_GLSL

@@ -1,150 +1,112 @@
 # Animation
 
-FlyTracer uses the **Motor** type from PGA (Projective Geometric Algebra) for object transformations. Motors elegantly combine rotation and translation into a single operation.
+FlyTracer uses the **Motor** type from PGA (Projective Geometric Algebra) for object transformations. A motor combines rotation and translation into one element, and transforms anything (points, lines, planes) with the sandwich product `M X ~M`. The renderer applies instance motors the same way on the GPU.
 
 ## The Update Loop
 
-Animation happens in `OnUpdate`, called every frame with delta time:
+Animation happens in `OnUpdate`, called every frame with the elapsed time:
 
 ```cpp
 void MyScene::OnUpdate(float deltaTime) {
-    m_time += deltaTime;  // Track total elapsed time
-
+    m_time += deltaTime;
     // Animate objects here...
 }
 ```
 
 ## Motors
 
-A **Motor** represents a rigid body transformation (rotation + translation). Motors can be composed by multiplication.
-
 ### Creating Motors
 
 ```cpp
 // Identity (no transformation)
-Motor M;  // Default constructor
+Motor identity{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
-// Pure translation
-Motor T = Motor::Translation(x, y, z);
+// Translation by (x, y, z) (from PGA.h)
+Motor T = TranslationMotor(x, y, z);
 
-// Pure rotation (angle in degrees, axis as BiVector)
-BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);  // Y axis
+// Rotation: angle in degrees around a line (a BiVector)
+BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);  // The y axis through the origin
 Motor R = Motor::Rotation(45.0f, yAxis);
 
-// Combined: first rotate, then translate
-Motor combined = T * R;  // Apply R first, then T
+// Rotation around any line, e.g. the join of two points
+BiVector line = TriVector(1.0f, 0.0f, 0.0f) & TriVector(1.0f, 1.0f, 0.0f);
+Motor aroundLine = Motor::Rotation(90.0f, line);
+```
+
+### Composition Order
+
+Motors compose by multiplication, and like matrices **the rightmost motor acts first**:
+
+```cpp
+Motor combined = T * R;  // First rotate (around the origin), then translate
+```
+
+### Applying a Motor
+
+```cpp
+TriVector moved = ApplyMotor(M, point);   // M point ~M, normalized to e123 = 1
 ```
 
 ### Common Rotation Axes
 
 ```cpp
-// Y axis (vertical, most common for orbits)
-BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-
-// X axis (pitch)
-BiVector xAxis(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
-
-// Z axis (roll)
-BiVector zAxis(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+BiVector xAxis(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);  // Pitch
+BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);  // Yaw, most common for orbits
+BiVector zAxis(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);  // Roll
 ```
 
 ## Animating Spheres
 
-Spheres store their center as a TriVector. Use the sandwich product to transform:
+Spheres store their center as a TriVector, so a motor moves it directly:
 
 ```cpp
 void MyScene::OnUpdate(float deltaTime) {
-    // Incremental rotation each frame
-    float angleDegrees = m_rotationSpeed * deltaTime * 57.3f;  // rad/s to deg
-    BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    Motor R = Motor::Rotation(angleDegrees, yAxis);
+    const float degreesThisFrame = 30.0f * deltaTime;
+    const Motor R = Motor::Rotation(degreesThisFrame, BiVector(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f));
 
     if (auto* sphere = GetSphere(m_sphereId)) {
-        // Transform center: R * center * ~R (sandwich product)
-        TriVector oldCenter = sphere->GetCenter();
-        TriVector newCenter = (R * oldCenter * ~R).Grade3();
-        sphere->SetCenter(newCenter);
+        sphere->center = ApplyMotor(R, sphere->center);  // Orbits the y axis
     }
 }
 ```
 
 ## Animating Meshes
 
-Mesh instances have a `transform` Motor that can be modified directly:
+Mesh instances have a `transform` motor:
 
 ```cpp
 void MyScene::OnUpdate(float deltaTime) {
-    float angleDeg = 30.0f * deltaTime;  // 30 degrees per second
-    BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    Motor R = Motor::Rotation(angleDeg, yAxis);
+    const Motor R = Motor::Rotation(30.0f * deltaTime, BiVector(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f));
 
     if (auto* instance = FindInstance("myMesh")) {
-        // Compose with existing transform
+        // After the existing transform, rotate around the world's y axis
         instance->transform = R * instance->transform;
     }
 }
 ```
 
-### Translation Animation
+Multiplying on the left applies the new motion in world space (after the existing transform); multiplying on the right (`instance->transform * R`) applies it in the object's own frame (before the existing transform).
+
+### Rotation and Translation
 
 ```cpp
 void MyScene::OnUpdate(float deltaTime) {
     m_time += deltaTime;
 
-    // Sine wave movement
-    float x = std::sin(m_time) * 5.0f;
-    Motor T = Motor::Translation(x, 0.0f, 0.0f);
-
-    if (auto* instance = FindInstance("bouncer")) {
-        instance->transform = T;
-    }
-}
-```
-
-### Combined Rotation + Translation
-
-```cpp
-void MyScene::OnUpdate(float deltaTime) {
-    m_time += deltaTime;
-
-    // Rotation
-    BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    Motor R = Motor::Rotation(m_time * 45.0f, yAxis);  // 45 deg/s
-
-    // Bobbing translation
-    float y = std::sin(m_time * 2.0f) * 0.5f;
-    Motor T = Motor::Translation(0.0f, y, 0.0f);
+    const Motor R = Motor::Rotation(m_time * 45.0f, BiVector(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f));
+    const Motor T = TranslationMotor(0.0f, std::sin(m_time * 2.0f) * 0.5f, 0.0f);
 
     if (auto* instance = FindInstance("floating")) {
-        // Rotate first, then bob up/down
-        instance->transform = T * R;
+        instance->transform = T * R;  // Spin in place, then bob up and down
     }
 }
 ```
 
-### Incremental Rotation + Translation per Frame
+## Interpolating a Motor
 
-To accumulate transformations over time (e.g., an object that continuously rotates while drifting), compose both the rotation and translation with the existing transform:
+A motor `M = cos(a) - sin(a) L` (for a normalized line `L`) rotates by `2a` around that line; `M` to the power `t` rotates by `2at`. A translation `M = 1 + d` to the power `t` is `1 + t d`. `MotorPower` (in `PGA.h`) does both, for any motor that is a pure rotation or translation, such as the product of two reflections. The bireflection scene animates the motor of two planes like this:
 
 ```cpp
-void MyScene::OnUpdate(float deltaTime) {
-    // Small rotation increment per frame
-    float incrementDegrees = m_rotationSpeed * deltaTime * 57.3f;
-    BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    Motor R = Motor::Rotation(incrementDegrees, yAxis);
-
-    // Small translation increment (e.g., sine wave drift)
-    float dx = std::sin(m_time) * 0.1f;
-    Motor translation(1.0f, dx * 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-
-    if (auto* pheasant = FindInstance("pheasant")) {
-        // Compose: new rotation * new translation * existing transform
-        // This accumulates both rotation and translation each frame
-        pheasant->transform = R * translation * pheasant->transform;
-    }
-}
+const Motor M = ReflectionMotor(firstPlane, secondPlane);
+pheasant->transform = MotorPower(M, t) * originalTransform;  // t from 0 to 1
 ```
-
-**Key insight**: Multiplying `R * translation * existing_transform` applies the incremental rotation and translation on top of the current state. Over many frames, the object will:
-- Continuously rotate (rotation accumulates)
-- Drift according to the translation pattern (translation accumulates)

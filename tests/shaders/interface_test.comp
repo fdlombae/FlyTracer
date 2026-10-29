@@ -1,0 +1,75 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_scalar_block_layout : require
+
+// Reads element 1 of every buffer the raytracer binds, and the push constants, with the raytracer's
+// own declarations, and writes the 32 bits of every member in declaration order.
+// tests/test_shader_interface.cpp compares them with the C++ structs of GpuScene.h.
+
+#include "common.glsl"
+#include "bindings.glsl"
+
+layout(local_size_x = 1) in;
+
+layout(binding = BINDING_COUNT) writeonly buffer Output { uint words[]; };
+
+uint next = 0u;
+
+void write(uint value) { words[next++] = value; }
+void write(int value) { write(uint(value)); }
+void write(float value) { write(floatBitsToUint(value)); }
+void write(vec3 value) { write(value.x); write(value.y); write(value.z); }
+void write(vec4 value) { write(value.xyz); write(value.w); }
+
+void write(NodePair pair) {
+    for (int i = 0; i < 2; ++i) {
+        write(pair.boxes[i].minimum);
+        write(pair.boxes[i].maximum);
+    }
+    write(pair.index.x); write(pair.index.y);
+    write(pair.count.x); write(pair.count.y);
+}
+
+void main() {
+    Vertex vertex = vertices[1];
+    write(vertex.positionU); write(vertex.normalV);
+
+    Triangle triangle = triangles[1];
+    write(triangle.indices[0]); write(triangle.indices[1]); write(triangle.indices[2]); write(triangle.materialIndex);
+
+    Edge edge = edges[1];
+    write(edge.anchor); write(edge.direction);
+
+    EdgeTriangle edgeTriangle = edgeTriangles[1];
+    write(edgeTriangle.edges[0]); write(edgeTriangle.edges[1]); write(edgeTriangle.edges[2]); write(edgeTriangle.triangle);
+
+    write(meshPairs[1]);
+    write(meshRootPairs[1]);
+
+    Material material = materials[1];
+    write(material.color); write(material.shadingMode); write(material.metallic); write(material.roughness);
+    write(material.shininess); write(material.reflectivity); write(material.textureIndex); write(material.specular);
+
+    Sphere sphere = spheres[1];
+    write(sphere.center); write(sphere.radius); write(sphere.materialIndex);
+
+    Plane plane = planes[1];
+    write(plane.normal); write(plane.e0); write(plane.materialIndex);
+
+    Light light = lights[1];
+    write(light.position); write(light.type); write(light.direction); write(light.range);
+    write(light.color); write(light.spotCosOuter); write(light.spotCosInner);
+
+    MeshInstance instance = instances[1];
+    write(instance.rotor); write(instance.dual); write(instance.mirror);
+    write(instance.scale); write(instance.meshId); write(instance.hasMirror);
+
+    write(scenePairs[1]);
+
+    DebugLine line = debugLines[1];
+    write(line.from); write(line.to); write(line.color);
+
+    write(pc.cameraRotor); write(pc.cameraDual); write(pc.tanHalfFov);
+    write(pc.sphereCount); write(pc.planeCount); write(pc.lightCount); write(pc.instanceCount);
+    write(pc.debugLineCount); write(pc.sampleIndex); write(pc.maxBounces); write(pc.exposure); write(pc.frameIndex);
+}

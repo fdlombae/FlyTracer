@@ -31,8 +31,8 @@ void MyScene::OnGui() {
     ImGui::TextColored(ImVec4(1, 0, 0, 1), "Warning: Low FPS!");
 
     // Formatted text
-    ImGui::Text("Camera: (%.2f, %.2f, %.2f)",
-                m_cameraEye.e032(), m_cameraEye.e013(), m_cameraEye.e021());
+    const TriVector& eye = GetCamera().eye;
+    ImGui::Text("Camera: (%.2f, %.2f, %.2f)", eye.e032(), eye.e013(), eye.e021());
 
     // Built-in FPS helper
     ImGui::Text("FPS: %.1f", GetFPS());
@@ -122,7 +122,9 @@ void MyScene::OnGui() {
 
     // Collapsible header
     if (ImGui::CollapsingHeader("Camera Settings")) {
-        ImGui::SliderFloat("FOV", &m_cameraFov, 20.0f, 120.0f);
+        if (ImGui::SliderFloat("FOV", &m_fov, 20.0f, 120.0f)) {
+            SetCameraFov(m_fov);
+        }
         ImGui::DragFloat3("Position", m_cameraPos);
     }
 

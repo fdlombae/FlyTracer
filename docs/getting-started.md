@@ -4,7 +4,7 @@
 
 - **CMake** 3.20 or higher
 - **C++23 compiler** - Clang, GCC 13+, or MSVC 2022
-- **Vulkan SDK** - With `glslc` shader compiler
+- **Vulkan SDK 1.4** - With `glslc` shader compiler. On macOS: SDK 1.4.363+ with the KosmicKrisp driver selected (Apple Silicon, macOS 26 or later)
 
 ## Building
 
@@ -12,7 +12,7 @@
 
 ```bash
 # Clone the repository
-git clone --recursive https://github.com/fdlombae/FlyTracer.git
+git clone https://github.com/fdlombae/FlyTracer.git
 cd FlyTracer
 
 # Configure
@@ -21,8 +21,9 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 # Build
 cmake --build build
 
-# Run
+# Run (from any directory: shaders and resources are found next to the executable)
 ./build/bin/FlyTracer
+./build/bin/FlyTracer --scene testbox
 ```
 
 ### Visual Studio
@@ -49,10 +50,8 @@ FlyTracer/
 │   └── shaders/       # GLSL compute shaders
 ├── game/
 │   ├── include/       # Your scene headers
-│   ├── src/           # Your scene implementation + main.cpp
+│   ├── src/           # Your scene implementation, the scene registry and main.cpp
 │   └── resources/     # Models, textures, config files
-├── external/
-│   └── FlyFish/       # PGA math library
 └── tests/             # Unit tests
 ```
 
@@ -69,9 +68,10 @@ class MyScene : public GameScene {
 public:
     explicit MyScene(const std::string& resourceDir);
 
-    void OnInit(VulkanRenderer* renderer) override;
+protected:
+    void OnInit() override;
     void OnUpdate(float deltaTime) override;
-    void OnInput(const InputState& input) override;
+    void OnInput(const Input& input) override;
     void OnGui() override;
 };
 ```
@@ -86,7 +86,7 @@ public:
 MyScene::MyScene(const std::string& resourceDir)
     : GameScene(resourceDir) {}
 
-void MyScene::OnInit(VulkanRenderer* renderer) {
+void MyScene::OnInit() {
     // Add scene objects here
     AddGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray()));
     AddSphere(TriVector(0.0f, 2.0f, 0.0f), 2.0f,
@@ -94,15 +94,14 @@ void MyScene::OnInit(VulkanRenderer* renderer) {
     AddPointLight(TriVector(5.0f, 10.0f, 5.0f),
                   Scene::Color::White(), 1.5f, 50.0f);
 
-    m_cameraEye = TriVector(0.0f, 5.0f, 15.0f);
-    m_cameraTarget = TriVector(0.0f, 2.0f, 0.0f);
+    SetCamera(TriVector(0.0f, 5.0f, 15.0f), TriVector(0.0f, 2.0f, 0.0f));
 }
 
 void MyScene::OnUpdate(float deltaTime) {
     // Animation logic here
 }
 
-void MyScene::OnInput(const InputState& input) {
+void MyScene::OnInput(const Input& input) {
     // Input handling here
 }
 
@@ -113,17 +112,22 @@ void MyScene::OnGui() {
 }
 ```
 
-3. Update `main.cpp` to use your scene:
+3. Register your scene in `game/src/SceneRegistry.cpp`: add its name to `kSceneNames` in `game/include/SceneRegistry.h`, and create it in `CreateScene`:
 
 ```cpp
-auto scene = std::make_unique<MyScene>(config.resourceDirectory);
+} else if (name == "myscene") {
+    return std::make_unique<MyScene>(resourceDir);
+}
 ```
 
-4. Add your `.cpp` file to `CMakeLists.txt`:
+and run it with `./build/bin/FlyTracer --scene myscene`. The benchmark (`--benchmark`) and the scene image test then include it too.
+
+4. Add your `.cpp` file to the scene sources in `CMakeLists.txt`:
 
 ```cmake
-add_executable(${PROJECT_NAME}
-    game/src/main.cpp
+set(GAME_SCENE_SOURCES
+    game/src/SceneRegistry.cpp
+    ...
     game/src/MyScene.cpp
 )
 ```
