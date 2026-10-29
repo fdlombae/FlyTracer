@@ -23,7 +23,8 @@ public:
     explicit MyScene(const std::string& resourceDir)
         : GameScene(resourceDir) {}
 
-    void OnInit(VulkanRenderer* renderer) override {
+protected:
+    void OnInit() override {
         // Ground
         AddGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color::Gray()));
 
@@ -36,8 +37,7 @@ public:
                       Scene::Color::White(), 1.5f, 50.0f);
 
         // Camera
-        m_cameraEye = TriVector(0.0f, 5.0f, 12.0f);
-        m_cameraTarget = TriVector(0.0f, 2.0f, 0.0f);
+        SetCamera(TriVector(0.0f, 5.0f, 12.0f), TriVector(0.0f, 2.0f, 0.0f));
     }
 };
 ```

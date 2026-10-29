@@ -1,22 +1,14 @@
 # Debug Visualization
 
-FlyTracer provides debug drawing functions to visualize points, lines, and coordinate axes as an ImGui overlay on top of the raytraced scene.
+FlyTracer provides debug drawing functions to visualize points, lines, and coordinate axes on top of the raytraced scene. The raytracer draws them itself as lines of constant pixel width, compared against the scene's depth: parts hidden behind objects are drawn dimmed.
 
 ## Setup
 
-Debug drawing is enabled by default. Call drawing functions in `OnUpdate` and render them in `OnGui`:
+Debug drawing is enabled by default (`SetDebugDrawEnabled(false)` turns it off). The lines are cleared before every `OnUpdate`, so draw them there:
 
 ```cpp
 void MyScene::OnUpdate(float deltaTime) {
-    // Draw debug primitives here
     DrawDebugLine(TriVector(0, 0, 0), TriVector(5, 5, 0), Scene::Color::Red());
-}
-
-void MyScene::OnGui() {
-    // Your ImGui code...
-
-    // Render all debug primitives
-    RenderDebugDraw();
 }
 ```
 
@@ -25,11 +17,7 @@ void MyScene::OnGui() {
 Draw lines between two points in 3D space.
 
 ```cpp
-// Using TriVectors
 DrawDebugLine(TriVector(x1, y1, z1), TriVector(x2, y2, z2), color);
-
-// Using float coordinates
-DrawDebugLine(x1, y1, z1, x2, y2, z2, color);
 ```
 
 ### Example: Grid
@@ -42,11 +30,11 @@ void MyScene::OnUpdate(float deltaTime) {
 
     // Draw grid lines along X axis
     for (float x = -gridSize; x <= gridSize; x += gridStep) {
-        DrawDebugLine(x, 0.01f, -gridSize, x, 0.01f, gridSize, gridColor);
+        DrawDebugLine(TriVector(x, 0.01f, -gridSize), TriVector(x, 0.01f, gridSize), gridColor);
     }
     // Draw grid lines along Z axis
     for (float z = -gridSize; z <= gridSize; z += gridStep) {
-        DrawDebugLine(-gridSize, 0.01f, z, gridSize, 0.01f, z, gridColor);
+        DrawDebugLine(TriVector(-gridSize, 0.01f, z), TriVector(gridSize, 0.01f, z), gridColor);
     }
 }
 ```
@@ -77,14 +65,14 @@ void MyScene::OnUpdate(float deltaTime) {
 
 ## Coordinate Axes
 
-Draw RGB coordinate axes (X=red, Y=green, Z=blue) at a position or transform.
+Draw RGB coordinate axes (X=red, Y=green, Z=blue) at a position, or the frame of a motor: the world axes transformed by it.
 
 ```cpp
 // At a position
 DrawDebugAxes(TriVector(x, y, z), size);
 
-// At a Motor transform
-DrawDebugAxes(motor, size);
+// The frame of a motor, e.g. a mesh instance's transform
+DrawDebugAxes(instance->transform, size);
 ```
 
 ### Example
@@ -96,15 +84,14 @@ void MyScene::OnUpdate(float deltaTime) {
 
     // Axes at an object's position
     if (auto* sphere = GetSphere(m_sphereId)) {
-        TriVector pos(sphere->center[0], sphere->center[1], sphere->center[2]);
-        DrawDebugAxes(pos, 1.0f);
+        DrawDebugAxes(sphere->center, 1.0f);
     }
 }
 ```
 
 ## BiVector Lines (PGA)
 
-Draw lines from a BiVector (Plücker line representation). Useful for visualizing PGA line elements.
+Draw lines from a BiVector (Plücker line representation). Useful for visualizing PGA line elements. The segment is centered on the point of the line closest to the origin.
 
 ```cpp
 DrawDebugLine(BiVector line, float halfLength, Scene::Color color);
@@ -148,24 +135,6 @@ void MyScene::OnUpdate(float deltaTime) {
 }
 ```
 
-## Rendering
-
-Debug primitives are collected during `OnUpdate` and rendered as an ImGui overlay. Call `RenderDebugDraw()` at the end of `OnGui`:
-
-```cpp
-void MyScene::OnGui() {
-    ImGui::Begin("Debug Panel");
-    ImGui::Checkbox("Show Axes", &m_showAxes);
-    ImGui::Checkbox("Show Grid", &m_showGrid);
-    ImGui::End();
-
-    // Always call at the end of OnGui
-    RenderDebugDraw();
-}
-```
-
-The debug draw list is automatically cleared each frame before `OnUpdate`.
-
 ## Toggling Visibility
 
 Use member variables to conditionally draw debug elements:
@@ -184,12 +153,10 @@ class MyScene : public GameScene {
         }
     }
 
-    void OnInput(const InputState& input) override {
+    void OnInput(const Input& input) override {
         // Toggle with number keys
-        if (input.key1 && !m_prevKey1) m_showAxes = !m_showAxes;
-        if (input.key2 && !m_prevKey2) m_showGrid = !m_showGrid;
-        m_prevKey1 = input.key1;
-        m_prevKey2 = input.key2;
+        if (input.WasPressed(Key::Num1)) m_showAxes = !m_showAxes;
+        if (input.WasPressed(Key::Num2)) m_showGrid = !m_showGrid;
     }
 };
 ```

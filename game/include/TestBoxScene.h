@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GameScene.h"
+#include "OrbitCamera.h"
 #include <cstdint>
 #include <numbers>
 
@@ -8,20 +9,16 @@ class TestBoxScene final : public GameScene {
 public:
     explicit TestBoxScene(const std::string& resourceDir);
 
-    void OnInit(VulkanRenderer* renderer) override;
+protected:
+    void OnInit() override;
     void OnUpdate(float deltaTime) override;
-    void OnInput(const InputState& input) override;
+    void OnInput(const Input& input) override;
     void OnGui() override;
-    void OnShutdown() override;
 
 private:
     static constexpr float kPi = std::numbers::pi_v<float>;
 
-    // Camera orbit
-    float m_cameraYaw{0.0f};
-    float m_cameraPitch{0.3f};
-    float m_cameraDistance{50.0f};
-    float m_mouseSensitivity{0.005f};
+    OrbitCamera m_orbit{TriVector(0.0f, 15.0f, 0.0f)};
 
     // Sphere rotation
     uint32_t m_sphere1Id{0};
@@ -37,8 +34,14 @@ private:
     uint32_t m_pheasantMeshId{0};
     float m_pheasantTime{0.0f};
     float m_pheasantSpeed{1.0f};
-    float m_pheasantAmplitudeX{20.0f};
-    float m_pheasantAmplitudeZ{10.0f};
+    float m_pheasantSway{5.0f};
     float m_pheasantHeight{0.0f};
     float m_pheasantScale{0.5f};
+
+    // Lights spawned at runtime
+    uint32_t m_spawnedLightCount{0};
+
+    void SpawnLight();
+    void DrawLightsGui();
+    void DrawInstancesGui();
 };

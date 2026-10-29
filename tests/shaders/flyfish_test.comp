@@ -1,0 +1,79 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+// Runs every flyfish.glsl function on one case of random inputs. Inputs and outputs are stored
+// with FlyFish's coefficient order, so tests/test_flyfish_glsl.cpp can compare them directly.
+
+#include "flyfish.glsl"
+
+layout(local_size_x = 64) in;
+
+layout(binding = 0) readonly buffer Inputs { float inputs[]; };
+layout(binding = 1) writeonly buffer Outputs { float outputs[]; };
+layout(push_constant) uniform PushConstants { uint caseCount; } pc;
+
+const uint INPUT_FLOATS = 44u;   // Must match kInputFloats in the test
+const uint OUTPUT_FLOATS = 70u;  // Must match kOutputFloats in the test
+
+uint outputIndex;
+
+TriVector readTriVector(uint i) {
+    return TriVector(vec3(inputs[i], inputs[i + 1], inputs[i + 2]), inputs[i + 3]);
+}
+
+BiVector readBiVector(uint i) {
+    return BiVector(vec3(inputs[i + 3], inputs[i + 4], inputs[i + 5]), vec3(inputs[i], inputs[i + 1], inputs[i + 2]));
+}
+
+Vector readVector(uint i) {
+    return Vector(vec3(inputs[i + 1], inputs[i + 2], inputs[i + 3]), inputs[i]);
+}
+
+Motor readMotor(uint i) {
+    return Motor(inputs[i], vec3(inputs[i + 4], inputs[i + 5], inputs[i + 6]),
+                 vec3(inputs[i + 1], inputs[i + 2], inputs[i + 3]), inputs[i + 7]);
+}
+
+void write(float value) { outputs[outputIndex++] = value; }
+void write(vec3 value) { write(value.x); write(value.y); write(value.z); }
+void write(TriVector x) { write(x.xyz); write(x.w); }
+void write(BiVector line) { write(line.moment); write(line.direction); }
+void write(Vector plane) { write(plane.e0); write(plane.normal); }
+void write(Motor m) { write(m.s); write(m.ideal); write(m.euclidean); write(m.e0123); }
+
+void main() {
+    uint testCase = gl_GlobalInvocationID.x;
+    if (testCase >= pc.caseCount) return;
+    uint i = testCase * INPUT_FLOATS;
+    outputIndex = testCase * OUTPUT_FLOATS;
+
+    TriVector p = readTriVector(i);
+    TriVector q = readTriVector(i + 4u);
+    TriVector d = readTriVector(i + 8u);
+    BiVector lineA = readBiVector(i + 12u);
+    BiVector lineB = readBiVector(i + 18u);
+    Vector planeA = readVector(i + 24u);
+    Vector planeB = readVector(i + 28u);
+    Vector unitPlane = readVector(i + 32u);
+    Motor motor = readMotor(i + 36u);
+
+    write(join(p, q));
+    write(join(p, lineA));
+    write(join(lineA, p));
+    write(join(p, planeA));
+    write(join(planeA, p));
+    write(join(lineA, lineB));
+    write(meet(planeA, planeB));
+    write(meet(lineA, planeA));
+    write(meet(planeA, lineA));
+    write(inner(p, lineA));
+    write(inner(planeA, planeB));
+    write(geometricProduct(planeA, planeB));
+    write(sandwich(motor, p));
+    write(sandwich(motor, d));
+    write(reverse(motor));
+    write(reflectInPlane(unitPlane, p));
+    write(reflectInPlane(unitPlane, d));
+    write(norm(lineA));
+    write(norm(planeA));
+}

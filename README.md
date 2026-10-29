@@ -8,20 +8,23 @@ A real-time Vulkan compute shader raytracer built for educational purposes at DA
 
 ## Features
 
-- **Vulkan 1.3 Compute Shader Raytracing** - Real-time raytracing using compute shaders
+- **Vulkan 1.4 Compute Shader Raytracing** - Whitted-style ray tracing with shadows and mirror/glossy reflections, accumulated over frames for anti-aliasing
+- **PGA throughout** - Instances are motors (and mirror planes), applied as sandwich products on the CPU and in the shader
+- **Raytracing in PGA** - Camera motor, watertight Plücker edge tests and plane reflections, written with `flyfish.glsl`; `--benchmark` times every scene
 - **Multiple Shading Models** - Flat, Lambert, Phong, and PBR materials
-- **BVH Acceleration** - Bounding Volume Hierarchy for efficient ray-mesh intersection
+- **Two-level BVH** - A top-level BVH over mesh instances, a bottom-level BVH per mesh
 - **OBJ Mesh Loading** - Load 3D models with materials via tinyobjloader
-- **Texture Support** - Diffuse texture mapping
+- **Texture Support** - Mipmapped sRGB textures, filtered with ray cones
+- **Linear Lighting** - sRGB inputs converted to linear, ACES tone mapping
 - **Scene Primitives** - Spheres, planes, and triangle meshes
-- **ImGui Integration** - Debug UI overlay
-- **Cross-Platform** - macOS (MoltenVK) and Windows
+- **ImGui Integration** - Debug UI and depth-tested debug lines
+- **Cross-Platform** - macOS (KosmicKrisp) and Windows
 
 ## Requirements
 
 - CMake 3.20+
 - C++23 compiler (Clang, GCC, or MSVC)
-- Vulkan SDK with glslc shader compiler
+- Vulkan SDK 1.4 with glslc shader compiler (macOS: SDK 1.4.363+ with the KosmicKrisp driver, Apple Silicon and macOS 26 or later)
 
 ## Building
 
@@ -32,8 +35,8 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 # Build
 cmake --build build
 
-# Run
-./build/bin/FlyTracer
+# Run (from any directory)
+./build/bin/FlyTracer --scene testbox
 ```
 
 ### Visual Studio
@@ -56,8 +59,6 @@ FlyTracer/
 │   ├── include/       # Game-specific headers
 │   ├── src/           # Game implementation
 │   └── resources/     # Models, textures, config
-├── external/
-│   └── FlyFish/       # PGA math library
 └── tests/             # Unit tests
 ```
 
@@ -68,3 +69,4 @@ Fetched automatically via CMake FetchContent:
 - [Dear ImGui](https://github.com/ocornut/imgui) - Debug UI
 - [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader) - OBJ loading
 - [Google Test](https://github.com/google/googletest) - Unit testing
+- [FlyFish](https://github.com/fdlombae/FlyFish) - PGA math (single header)

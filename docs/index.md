@@ -1,16 +1,18 @@
 # FlyTracer
 
-A real-time **Vulkan compute shader raytracer** built for educational purposes. Uses Projective Geometric Algebra (PGA) via the [FlyFish](https://github.com/fdlombae/FlyFish) library for 3D transformations.
+A real-time **Vulkan compute shader raytracer** built for educational purposes. Uses Projective Geometric Algebra (PGA) via the [FlyFish](https://github.com/fdlombae/FlyFish) library for 3D transformations: object transforms are motors (and mirror planes), applied as sandwich products on the CPU and on the GPU.
 
 ## Features
 
-- **Vulkan 1.3 Compute Shader Raytracing** - Real-time raytracing on the GPU
+- **Vulkan 1.4 Compute Shader Raytracing** - Whitted-style ray tracing with shadows and (glossy) reflections, accumulated over frames for anti-aliasing
 - **Multiple Shading Models** - Flat, Lambert, Phong, and PBR materials
-- **BVH Acceleration** - Bounding Volume Hierarchy for efficient ray-mesh intersection
-- **OBJ Mesh Loading** - Load 3D models with textures
+- **Two-level BVH** - A top-level BVH over mesh instances and a bottom-level BVH per mesh
+- **OBJ Mesh Loading** - Load 3D models with mipmapped textures
 - **Scene Primitives** - Spheres and infinite planes
 - **Multiple Light Types** - Point, directional, and spot lights
-- **PGA Transformations** - Motors for rotations and translations
+- **PGA Transformations** - Motors for rotations and translations, planes for reflections
+- **Raytracing in PGA** - Rays, triangles, reflections and the camera as points, lines, planes and motors (see [The PGA Raytracer](pga-tracer.md))
+- **Linear lighting** - sRGB colors and textures are converted to linear, then tone mapped
 
 ## Quick Example
 
@@ -20,7 +22,8 @@ public:
     explicit MyScene(const std::string& resourceDir)
         : GameScene(resourceDir) {}
 
-    void OnInit(VulkanRenderer* renderer) override {
+protected:
+    void OnInit() override {
         // Add a ground plane
         AddGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color(0.5f, 0.5f, 0.5f)));
 
@@ -32,9 +35,8 @@ public:
         AddPointLight(TriVector(5.0f, 10.0f, 5.0f),
                       Scene::Color::White(), 1.5f, 50.0f);
 
-        // Set camera
-        m_cameraEye = TriVector(0.0f, 5.0f, 15.0f);
-        m_cameraTarget = TriVector(0.0f, 2.0f, 0.0f);
+        // Look from the eye at the target
+        SetCamera(TriVector(0.0f, 5.0f, 15.0f), TriVector(0.0f, 2.0f, 0.0f));
     }
 };
 ```

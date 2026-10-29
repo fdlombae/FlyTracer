@@ -5,8 +5,6 @@ site/
 bin/
 lib/
 
-external/
-
 # IDE files
 .idea/
 .vscode/
@@ -30,6 +28,8 @@ Makefile
 *.lo
 *.o
 *.obj
+# ...but Wavefront OBJ meshes are resources
+!game/resources/**/*.obj
 
 # Precompiled Headers
 *.gch
@@ -58,3 +58,10 @@ FlyTracer
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local tool and editor state
+.cache/
+imgui.ini
+
+# Course assignment documents
+GEOA-*
