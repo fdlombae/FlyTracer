@@ -3,6 +3,7 @@
 #include <imgui_impl_sdl3.h>
 #include <algorithm>
 #include <array>
+#include <iostream>
 #include <optional>
 #include <stdexcept>
 
@@ -52,6 +53,16 @@ constexpr std::array kKeyBindings{
     KeyBinding{SDLK_8, Key::Num8, false},
     KeyBinding{SDLK_9, Key::Num9, false},
 };
+
+// The left and right modifier keys are one key for the game, which is down while either of them is
+bool otherModifierDown(Key key, SDL_Keymod modifiers) {
+    switch (key) {
+        case Key::Shift: return (modifiers & SDL_KMOD_SHIFT) != 0;
+        case Key::Ctrl: return (modifiers & SDL_KMOD_CTRL) != 0;
+        case Key::Alt: return (modifiers & SDL_KMOD_ALT) != 0;
+        default: return false;
+    }
+}
 
 const KeyBinding* findKeyBinding(SDL_Keycode sdlKey) {
     const auto it = std::ranges::find(kKeyBindings, sdlKey, &KeyBinding::sdlKey);
@@ -110,6 +121,7 @@ Application::Application(const FlyTracer::AppConfig& config, std::unique_ptr<Gam
         m_gameScene->Init();
         m_renderer->UploadMeshes(m_gameScene->GetMeshes());
     } catch (...) {
+        m_gameScene->Shutdown();
         m_renderer.reset();
         SDL_DestroyWindow(m_window);
         SDL_Quit();
@@ -118,7 +130,11 @@ Application::Application(const FlyTracer::AppConfig& config, std::unique_ptr<Gam
 }
 
 Application::~Application() noexcept {
-    m_gameScene->Shutdown();
+    try {
+        m_gameScene->Shutdown();
+    } catch (const std::exception& e) {
+        std::cerr << "Scene shutdown failed: " << e.what() << '\n';
+    }
     m_gameScene.reset();
     m_renderer.reset();  // Uses the window's surface, so it goes first
     SDL_DestroyWindow(m_window);
@@ -131,6 +147,10 @@ void Application::run() {
     const auto frequency = static_cast<double>(SDL_GetPerformanceFrequency());
 
     while (m_running) {
+        // Nothing is drawn while minimized: wait for events instead of spinning
+        if (SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) {
+            SDL_WaitEventTimeout(nullptr, 100);
+        }
         const Uint64 currentTime = SDL_GetPerformanceCounter();
         const double deltaTime = std::min(static_cast<double>(currentTime - lastTime) / frequency, kMaxDeltaTime);
         lastTime = currentTime;
@@ -173,7 +193,8 @@ void Application::handleEvents() {
                 }
                 break;
             case SDL_EVENT_KEY_UP:
-                if (const KeyBinding* binding = findKeyBinding(event.key.key)) {
+                if (const KeyBinding* binding = findKeyBinding(event.key.key);
+                    binding && !otherModifierDown(binding->key, event.key.mod)) {
                     m_input.SetKey(binding->key, false);
                 }
                 break;
