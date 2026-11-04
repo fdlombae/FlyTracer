@@ -19,7 +19,7 @@ void BiReflectionScene::OnInit() {
     const std::array<Scene::Color, 2> quadColors{Scene::Color(1.0f, 1.0f, 0.0f), Scene::Color(1.0f, 0.0f, 1.0f)};
     for (size_t i = 0; i < quadColors.size(); ++i) {
         m_quadMeshIds[i] = LoadMesh("quad.obj");
-        GetMesh(m_quadMeshIds[i])->GetMaterial(0) = Scene::Material::Lambert(quadColors[i]);
+        GetMeshMaterial(m_quadMeshIds[i], 0) = Scene::Material::Lambert(quadColors[i]);
         m_planes[i].color = quadColors[i];
     }
 

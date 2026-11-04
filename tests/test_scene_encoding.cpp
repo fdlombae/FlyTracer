@@ -4,6 +4,7 @@
 #include "test_scene.h"
 #include <algorithm>
 #include <limits>
+#include <stdexcept>
 #include <memory>
 #include <vector>
 
@@ -60,12 +61,12 @@ TEST(SceneEncodingTest, ChangedMeshesAreNoticed) {
     const MeshTable table = EncodeMeshes(scene.GetMeshes(), 64).table;
     EXPECT_FALSE(MeshesChanged(table, scene.GetMeshes()));
 
-    scene.GetMesh(meshId)->GetMaterial(0).color = Scene::Color(1.0f, 0.0f, 0.0f);
+    scene.GetMeshMaterial(meshId, 0).color = Scene::Color(1.0f, 0.0f, 0.0f);
     EXPECT_FALSE(MeshesChanged(table, scene.GetMeshes()));  // Colors are read every frame
 
-    scene.GetMesh(meshId)->GetMaterial(0).texturePath = "wood.png";
+    scene.GetMeshMaterial(meshId, 0).texturePath = "wood.png";
     EXPECT_TRUE(MeshesChanged(table, scene.GetMeshes()));
-    scene.GetMesh(meshId)->GetMaterial(0).texturePath.clear();
+    scene.GetMeshMaterial(meshId, 0).texturePath.clear();
 
     scene.AddMesh(makeBox(Scene::Color::White()));
     EXPECT_TRUE(MeshesChanged(table, scene.GetMeshes()));
@@ -78,7 +79,7 @@ TEST(SceneEncodingTest, MaterialsAreReadEveryFrame) {
     scene.AddPlane(Vector(0.0f, 0.0f, 1.0f, 0.0f), Scene::Material::Lambert(Scene::Color::White()));
     const MeshTable table = EncodeMeshes(scene.GetMeshes(), 64).table;
 
-    scene.GetMesh(meshId)->GetMaterial(0).color = Scene::Color(0.0f, 0.0f, 1.0f);
+    scene.GetMeshMaterial(meshId, 0).color = Scene::Color(0.0f, 0.0f, 1.0f);
     const FrameData frame = EncodeFrame(scene, table);
     ASSERT_EQ(frame.materials.size(), 3u);
     EXPECT_FLOAT_EQ(frame.materials[0].color[0], 0.0f);
@@ -95,6 +96,8 @@ TEST(SceneEncodingTest, OnlyDrawableInstancesAreEncoded) {
     scene.GetInstance(scene.AddMeshInstance(meshId, TriVector(9.0f, 0.0f, 0.0f)))->scale =
         std::numeric_limits<float>::quiet_NaN();
     scene.GetInstance(scene.AddMeshInstance(meshId, TriVector(7.0f, 0.0f, 0.0f)))->visible = false;
+    scene.AddMeshInstance(meshId, Motor{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f});
+    scene.AddMeshInstance(meshId, TranslationMotor(std::numeric_limits<float>::infinity(), 0.0f, 0.0f));
     const MeshTable table = EncodeMeshes(scene.GetMeshes(), 64).table;
     // A mesh added after the meshes were encoded has no buffers yet
     scene.AddMeshInstance(scene.AddMesh(makeBox(Scene::Color::White())), TriVector(3.0f, 0.0f, 0.0f));
@@ -116,4 +119,12 @@ TEST(SceneEncodingTest, TopLevelLeavesCoverEveryInstanceOnce) {
     collectLeaves(frame.scenePairs, 0, instances);
     std::ranges::sort(instances);
     EXPECT_EQ(instances, (std::vector<int32_t>{0, 1, 2, 3, 4}));
+}
+
+TEST(SceneEncodingTest, InvalidPlanesAndLightsAreRejected) {
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    EXPECT_THROW((void)Gpu::Encode(Scene::Plane{Vector(1.0f, 0.0f, 0.0f, 0.0f), {}}, 0), std::invalid_argument);
+    EXPECT_THROW((void)Gpu::Encode(Scene::Plane{Vector(0.0f, nan, 1.0f, 0.0f), {}}, 0), std::invalid_argument);
+    EXPECT_THROW((void)Gpu::Encode(Scene::Light::Directional(TriVector(nan, -1.0f, 0.0f, 0.0f), Scene::Color::White(), 1.0f)),
+                 std::invalid_argument);
 }

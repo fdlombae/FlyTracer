@@ -22,7 +22,7 @@ Meshes are moved so they are centered on the origin with their lowest point at y
 
 A mesh can also be built in code, with `Mesh::AddVertex`, `AddTriangle` and `AddMaterial`, and added with `AddMesh(std::move(mesh))`.
 
-Meshes can be loaded or added at any time, also while the scene runs: the renderer uploads them before the next frame, which briefly waits for the GPU. Material properties of a mesh (`GetMesh(meshId)->GetMaterial(i)`) can change every frame. Changing a mesh's vertices or triangles after it was added is not supported: add a new mesh instead.
+Meshes can be loaded or added at any time, also while the scene runs: the renderer uploads them before the next frame, which briefly waits for the GPU. Material properties of a mesh (`GetMeshMaterial(meshId, i)`) can change every frame. A mesh's vertices and triangles are fixed once it is added (`GetMesh` only gives const access): add a new mesh instead. `AddMesh` checks that every triangle refers to existing vertices and materials and gives a mesh without materials the default material.
 
 `GetMesh(meshId)` gives the mesh's measures, for closed meshes (`IsClosed()`): `Volume()`, `CenterOfMass()` and `Inertia()`, the principal moments of inertia with a rotor that turns the coordinate axes into the principal axes. See [Mesh Measures](../pga-tracer.md#mesh-measures) for how PGA computes them.
 

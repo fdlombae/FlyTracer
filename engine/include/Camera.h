@@ -17,7 +17,8 @@ struct Camera {
 // The motor that moves the camera's own frame, at the origin looking down -z with +y up and +x to
 // the right, into the world: the origin goes to the eye, -z to the viewing direction. It first turns
 // -z towards the viewing direction, then rolls around that direction until +y points up.
-// Returns nullopt when eye equals target or the view direction is parallel to the up hint.
+// Returns nullopt when eye equals target, the up hint is zero or parallel to the view direction, or an
+// input is not finite.
 [[nodiscard]] inline std::optional<Motor> CameraMotor(const Camera& camera) {
     // The view line, and the planes through it: along the up hint, with the camera's right as its
     // normal (the join of a line and a direction d has normal d x the line's direction), and along
@@ -25,7 +26,10 @@ struct Camera {
     const BiVector view = Euclidean(camera.eye) & Euclidean(camera.target);
     const TriVector forward = LineDirection(view);
     const Vector side = view & camera.up;
-    if (forward.VNorm() < 1e-6f || side.Norm() < 1e-6f * forward.VNorm() * camera.up.VNorm()) {
+    const float forwardLength = forward.VNorm();
+    const float upLength = camera.up.VNorm();
+    // Negated, so that NaNs fail the tests too
+    if (!(forwardLength >= 1e-6f) || !(upLength > 0.0f) || !(side.Norm() >= 1e-6f * forwardLength * upLength)) {
         return std::nullopt;
     }
     const TriVector right = PlaneNormal(side) * -1.0f;
@@ -39,7 +43,7 @@ struct Camera {
     const TriVector origin(0.0f, 0.0f, 0.0f);
     const bool upsideDown = -((origin & turnedUp) | (origin & up)) < -0.9999f * up.VNorm();
     const Motor roll = upsideDown ? Motor::Rotation(180.0f, origin & forward) : RotationBetween(turnedUp, up);
-    return TranslationMotor(Euclidean(camera.eye)) * roll * turn;
+    return TranslationMotor(camera.eye) * roll * turn;
 }
 
 // The line from the eye through a point of a window of the given size, measured from its top left

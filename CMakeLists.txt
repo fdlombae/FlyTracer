@@ -138,14 +138,15 @@ target_include_directories(${PROJECT_NAME} PRIVATE game/include)
 target_link_libraries(${PROJECT_NAME} PRIVATE FlyTracerEngine)
 
 # =============================================================================
-# Shaders and resources, next to the executable (paths are resolved relative to it)
+# Shaders and resources, next to the executables (paths are resolved relative to them). Multi-configuration
+# generators (Visual Studio, Xcode) put the executables in bin/<config>, so the assets are copied there.
 # =============================================================================
 if(NOT Vulkan_GLSLC_EXECUTABLE)
     message(FATAL_ERROR "glslc not found - install the Vulkan SDK")
 endif()
 
 set(SHADER_DIR ${PROJECT_SOURCE_DIR}/engine/shaders)
-set(SHADER_OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
+set(SHADER_OUTPUT_DIR ${CMAKE_BINARY_DIR}/shaders)
 file(GLOB SHADER_INCLUDES CONFIGURE_DEPENDS ${SHADER_DIR}/*.glsl)
 list(APPEND SHADER_INCLUDES ${PROJECT_SOURCE_DIR}/engine/include/ShaderInterface.h)
 
@@ -168,14 +169,18 @@ function(compile_shaders TARGET SOURCE_DIR OUTPUT_DIR)
     add_custom_target(${TARGET} ${ARGN} DEPENDS ${OUTPUTS})
 endfunction()
 
-compile_shaders(Shaders ${SHADER_DIR} ${SHADER_OUTPUT_DIR} ALL)
-add_dependencies(${PROJECT_NAME} Shaders)
+compile_shaders(Shaders ${SHADER_DIR} ${SHADER_OUTPUT_DIR})
 
-add_custom_target(CopyResources ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/game/resources ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/resources
-    COMMENT "Copying game resources"
+get_property(MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+set(RUNTIME_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}$<$<BOOL:${MULTI_CONFIG}>:/$<CONFIG>>)
+
+add_custom_target(CopyAssets ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/game/resources ${RUNTIME_DIR}/resources
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${SHADER_OUTPUT_DIR} ${RUNTIME_DIR}/shaders
+    COMMENT "Copying shaders and game resources"
 )
-add_dependencies(${PROJECT_NAME} CopyResources)
+add_dependencies(CopyAssets Shaders)
+add_dependencies(${PROJECT_NAME} CopyAssets)
 
 # =============================================================================
 # Tests
@@ -205,25 +210,29 @@ add_executable(FlyTracer_RenderTest tests/test_render.cpp tests/test_image_file.
 target_link_libraries(FlyTracer_RenderTest PRIVATE FlyTracerEngine GTest::gtest_main)
 target_compile_definitions(FlyTracer_RenderTest PRIVATE
     FLYTRACER_TEST_REFERENCE_DIR="${PROJECT_SOURCE_DIR}/tests/reference")
-add_dependencies(FlyTracer_RenderTest Shaders)
+add_dependencies(FlyTracer_RenderTest CopyAssets)
 gtest_discover_tests(FlyTracer_RenderTest)
 
 # Golden images of every game scene; needs a Vulkan GPU and skips itself when there is none
 add_executable(FlyTracer_SceneTest tests/test_scene_images.cpp ${GAME_SCENE_SOURCES})
 target_include_directories(FlyTracer_SceneTest PRIVATE game/include)
 target_link_libraries(FlyTracer_SceneTest PRIVATE FlyTracerEngine GTest::gtest_main)
-add_dependencies(FlyTracer_SceneTest Shaders CopyResources)
+add_dependencies(FlyTracer_SceneTest CopyAssets)
 target_compile_definitions(FlyTracer_SceneTest PRIVATE FLYTRACER_TEST_REFERENCE_DIR="${PROJECT_SOURCE_DIR}/tests/reference")
 gtest_discover_tests(FlyTracer_SceneTest DISCOVERY_TIMEOUT 30)
 
 # Shaders that only the tests use
-compile_shaders(TestShaders ${PROJECT_SOURCE_DIR}/tests/shaders ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_shaders)
+compile_shaders(TestShaders ${PROJECT_SOURCE_DIR}/tests/shaders ${CMAKE_BINARY_DIR}/test_shaders)
+add_custom_target(CopyTestShaders
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/test_shaders ${RUNTIME_DIR}/test_shaders
+)
+add_dependencies(CopyTestShaders TestShaders)
 
 # flyfish.glsl against FlyFish, and the GLSL structs and bindings against C++; needs a Vulkan GPU and skips
 # itself when there is none
 add_executable(FlyTracer_ShaderTest tests/test_flyfish_glsl.cpp tests/test_shader_interface.cpp)
 target_link_libraries(FlyTracer_ShaderTest PRIVATE FlyTracerEngine GTest::gtest_main)
-add_dependencies(FlyTracer_ShaderTest TestShaders)
+add_dependencies(FlyTracer_ShaderTest CopyTestShaders)
 gtest_discover_tests(FlyTracer_ShaderTest)
 
 add_executable(FlyTracer_ConfigTest tests/test_config.cpp)

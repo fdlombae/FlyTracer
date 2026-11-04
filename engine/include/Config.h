@@ -31,7 +31,19 @@ bool parseNumber(std::string_view str, T& out) noexcept {
     return true;
 }
 
+// The same, for a number in [min, max]
+template<typename T>
+bool parseNumber(std::string_view str, T& out, T min, T max) noexcept {
+    T value{};
+    if (!parseNumber(str, value) || value < min || value > max) return false;
+    out = value;
+    return true;
+}
+
 struct AppConfig {
+    static constexpr int kMaxWindowSize{16384};
+    static constexpr int kMaxRayBounces{32};
+
     // Window settings
     int windowWidth{1280};
     int windowHeight{720};
@@ -96,12 +108,12 @@ struct AppConfig {
 private:
     void parseConfigLine(std::string_view key, std::string_view value) {
         const bool flag = value == "true" || value == "1";
-        if (key == "window_width") parseNumber(value, windowWidth);
-        else if (key == "window_height") parseNumber(value, windowHeight);
+        if (key == "window_width") parseNumber(value, windowWidth, 1, kMaxWindowSize);
+        else if (key == "window_height") parseNumber(value, windowHeight, 1, kMaxWindowSize);
         else if (key == "window_title") windowTitle = value;
         else if (key == "fullscreen") fullscreen = flag;
         else if (key == "vsync") vsync = flag;
-        else if (key == "max_ray_bounces") parseNumber(value, maxRayBounces);
+        else if (key == "max_ray_bounces") parseNumber(value, maxRayBounces, 1, kMaxRayBounces);
         else if (key == "resource_directory") resourceDirectory = value;
         else if (key == "shader_directory") shaderDirectory = value;
     }

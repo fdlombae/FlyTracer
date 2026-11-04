@@ -108,7 +108,7 @@ TEST(RenderTest, SceneChangesAfterInitAreDrawn) {
     EXPECT_GT(red[0], 150);
     EXPECT_LT(red[1], 50);
 
-    scene.GetMesh(meshId)->GetMaterial(0) = Scene::Material::Flat(Scene::Color(0.0f, 1.0f, 0.0f));
+    scene.GetMeshMaterial(meshId, 0) = Scene::Material::Flat(Scene::Color(0.0f, 1.0f, 0.0f));
     const auto green = centerPixel();
     EXPECT_LT(green[0], 50);
     EXPECT_GT(green[1], 150);

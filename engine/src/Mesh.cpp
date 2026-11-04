@@ -106,6 +106,17 @@ bool Mesh::LoadFromFile(const std::string& filename) {
     if (!warn.empty()) {
         std::cout << "Warning loading " << filename << ": " << warn << std::endl;
     }
+    // tinyobjloader only warns about positions and texture coordinates that do not exist
+    const auto validIndex = [](const tinyobj::index_t& index, const tinyobj::attrib_t& attrib) {
+        return index.vertex_index >= 0 && static_cast<size_t>(index.vertex_index) < attrib.vertices.size() / 3 &&
+               (index.texcoord_index < 0 || static_cast<size_t>(index.texcoord_index) < attrib.texcoords.size() / 2);
+    };
+    for (const auto& shape : shapes) {
+        if (!std::ranges::all_of(shape.mesh.indices, [&](const auto& index) { return validIndex(index, attrib); })) {
+            std::cerr << "Failed to load " << filename << ": a face refers to a missing vertex" << std::endl;
+            return false;
+        }
+    }
 
     Clear();
     // OBJ materials become PBR materials
@@ -118,17 +129,15 @@ bool Mesh::LoadFromFile(const std::string& filename) {
         }
     }
     if (m_materials.empty()) {
-        m_materials.push_back(Scene::Material::PBR(Scene::Color(0.8f, 0.8f, 0.8f)));
+        m_materials.push_back(Scene::Material::Default());
     }
 
     // Face corners with the same position, texture coordinate and normal indices share a vertex
     std::map<std::array<int, 3>, uint32_t> vertexMap;
     const auto vertexOf = [&](const tinyobj::index_t& index) {
         Vertex vertex{};
-        if (index.vertex_index >= 0) {
-            const float* p = &attrib.vertices[3 * index.vertex_index];
-            vertex.position = TriVector(p[0], p[1], p[2]);
-        }
+        const float* p = &attrib.vertices[3 * index.vertex_index];
+        vertex.position = TriVector(p[0], p[1], p[2]);
         // Some OBJ files reference normals (f v/vt/vn) without defining them (no vn lines)
         if (index.normal_index >= 0 && static_cast<size_t>(3 * index.normal_index + 2) < attrib.normals.size()) {
             const float* n = &attrib.normals[3 * index.normal_index];
@@ -175,9 +184,15 @@ bool Mesh::LoadFromFile(const std::string& filename) {
 }
 
 void Mesh::Clear() {
+    m_bvh = {};
     m_vertices.clear();
     m_triangles.clear();
     m_materials.clear();
+}
+
+void Mesh::AddVertex(const Vertex& vertex) {
+    m_vertices.push_back(vertex);
+    m_vertices.back().position = Euclidean(vertex.position);
 }
 
 void Mesh::ComputeNormals() {
@@ -248,14 +263,18 @@ float Mesh::Volume() const {
     return volume;
 }
 
-// Every tetrahedron's centroid (p0 + p1 + p2 + apex) / 4, weighted by its volume
+// Every tetrahedron's centroid (p0 + p1 + p2 + apex) / 4, weighted by its volume. The offsets of the
+// centroids from the apex are summed, so the result does not depend on the size or position of the solid.
 TriVector Mesh::CenterOfMass() const {
     const TriVector apex = boundsCenter(*this);
-    TriVector weightedSum(0.0f, 0.0f, 0.0f, 0.0f);
+    TriVector weightedOffset(0.0f, 0.0f, 0.0f, 0.0f);
+    float totalVolume = 0.0f;
     forEachTetrahedron(*this, apex, [&](const TriVector& p0, const TriVector& p1, const TriVector& p2, float volume) {
-        weightedSum += (p0 + p1 + p2 + apex) * volume;
+        weightedOffset += (p0 + p1 + p2 - apex * 3.0f) * volume;
+        totalVolume += volume;
     });
-    return Euclidean(weightedSum);
+    if (totalVolume == 0.0f) return apex;
+    return apex + weightedOffset * (1.0f / (4.0f * totalVolume));
 }
 
 // The inertia tensor is a frame of three planes through the origin ("Clean up your Mesh!",

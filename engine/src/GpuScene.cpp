@@ -48,8 +48,8 @@ Sphere Encode(const Scene::Sphere& sphere, uint32_t materialIndex) {
 }
 
 Plane Encode(const Scene::Plane& plane, uint32_t materialIndex) {
-    if (plane.plane.Norm() < 1e-12f) {
-        throw std::invalid_argument("A plane needs a normal, the plane at infinity cannot be drawn");
+    if (!(plane.plane.Norm() >= 1e-12f) || !std::ranges::all_of(plane.plane, [](float c) { return std::isfinite(c); })) {
+        throw std::invalid_argument("A plane needs a finite normal, the plane at infinity cannot be drawn");
     }
     const Vector p = plane.plane.Normalized();
     return {.normal = {p.e1(), p.e2(), p.e3()}, .e0 = p.e0(), .materialIndex = materialIndex};
@@ -57,8 +57,8 @@ Plane Encode(const Scene::Plane& plane, uint32_t materialIndex) {
 
 Light Encode(const Scene::Light& light) {
     const float length = light.direction.VNorm();
-    if (light.type != Scene::LightType::Point && length < 1e-12f) {
-        throw std::invalid_argument("Directional and spot lights need a direction");
+    if (light.type != Scene::LightType::Point && !(length >= 1e-12f && std::isfinite(length))) {
+        throw std::invalid_argument("Directional and spot lights need a finite direction");
     }
     const float softness = std::clamp(light.spotSoftness, 0.0f, 1.0f);
     return {

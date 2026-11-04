@@ -150,9 +150,7 @@ void MyScene::OnUpdate(float deltaTime) {
     if (auto* sphere = GetSphere(m_sphereId)) {
         sphere->material.roughness = 0.5f * (std::sin(m_time) + 1.0f);  // 0 to 1
     }
-    if (Mesh* mesh = GetMesh(m_meshId)) {
-        mesh->GetMaterial(0).color = m_highlighted ? Scene::Color(1.0f, 0.8f, 0.2f) : Scene::Color::White();
-    }
+    GetMeshMaterial(m_meshId, 0).color = m_highlighted ? Scene::Color(1.0f, 0.8f, 0.2f) : Scene::Color::White();
 }
 ```
 

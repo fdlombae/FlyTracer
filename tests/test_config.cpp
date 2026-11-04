@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "Config.h"
-#include <filesystem>
+#include "temp_file.h"
 #include <fstream>
 #include <string>
 
@@ -8,19 +8,15 @@ using namespace FlyTracer;
 
 class ConfigTest : public ::testing::Test {
 protected:
-    void TearDown() override {
-        std::filesystem::remove(m_path);
-    }
-
     // Writes the text to a config file and loads it
     AppConfig Load(const std::string& text) {
-        std::ofstream(m_path) << text;
+        std::ofstream(m_file.Path()) << text;
         AppConfig config;
-        EXPECT_TRUE(config.loadFromFile(m_path.string()));
+        EXPECT_TRUE(config.loadFromFile(m_file.String()));
         return config;
     }
 
-    const std::filesystem::path m_path = std::filesystem::temp_directory_path() / "flytracer_test_config.cfg";
+    const TempFile m_file{".cfg"};
 };
 
 TEST_F(ConfigTest, DefaultValues) {
@@ -57,7 +53,7 @@ TEST_F(ConfigTest, LoadFromFile) {
 // A missing file keeps the defaults
 TEST_F(ConfigTest, LoadFromNonExistentFile) {
     AppConfig config;
-    EXPECT_FALSE(config.loadFromFile((std::filesystem::temp_directory_path() / "flytracer_missing.cfg").string()));
+    EXPECT_FALSE(config.loadFromFile(TempFile(".cfg").String()));
     EXPECT_EQ(config.windowWidth, 1280);
     EXPECT_EQ(config.windowHeight, 720);
 }
@@ -68,10 +64,10 @@ TEST_F(ConfigTest, SaveToFile) {
     config.windowHeight = 1080;
     config.windowTitle = "SavedConfig";
     config.maxRayBounces = 6;
-    ASSERT_TRUE(config.saveToFile(m_path.string()));
+    ASSERT_TRUE(config.saveToFile(m_file.String()));
 
     AppConfig loaded;
-    ASSERT_TRUE(loaded.loadFromFile(m_path.string()));
+    ASSERT_TRUE(loaded.loadFromFile(m_file.String()));
     EXPECT_EQ(loaded.windowWidth, 1920);
     EXPECT_EQ(loaded.windowHeight, 1080);
     EXPECT_EQ(loaded.windowTitle, "SavedConfig");
@@ -104,6 +100,18 @@ TEST_F(ConfigTest, InvalidNumericValues) {
     EXPECT_EQ(config.maxRayBounces, 3);
 }
 
+// Sizes and bounce counts the renderer cannot use keep the previous values
+TEST_F(ConfigTest, OutOfRangeValues) {
+    const AppConfig config = Load("window_width=0\nwindow_height=-600\nmax_ray_bounces=0\n");
+    EXPECT_EQ(config.windowWidth, 1280);
+    EXPECT_EQ(config.windowHeight, 720);
+    EXPECT_EQ(config.maxRayBounces, 3);
+
+    const AppConfig large = Load("window_width=100000\nmax_ray_bounces=1000\n");
+    EXPECT_EQ(large.windowWidth, 1280);
+    EXPECT_EQ(large.maxRayBounces, 3);
+}
+
 TEST_F(ConfigTest, MalformedLinesSkipped) {
     const AppConfig config = Load("this line has no equals\nwindow_width=800\nanother bad line\n");
     EXPECT_EQ(config.windowWidth, 800);
@@ -117,4 +125,15 @@ TEST(ParseNumberTest, WholeStringOnly) {
     EXPECT_FALSE(parseNumber("12abc", value));
     EXPECT_FALSE(parseNumber("", value));
     EXPECT_EQ(value, 42);
+}
+
+TEST(ParseNumberTest, Range) {
+    int value = 7;
+    EXPECT_TRUE(parseNumber("1", value, 1, 10));
+    EXPECT_TRUE(parseNumber("10", value, 1, 10));
+    EXPECT_EQ(value, 10);
+    EXPECT_FALSE(parseNumber("0", value, 1, 10));
+    EXPECT_FALSE(parseNumber("11", value, 1, 10));
+    EXPECT_FALSE(parseNumber("5x", value, 1, 10));
+    EXPECT_EQ(value, 10);
 }

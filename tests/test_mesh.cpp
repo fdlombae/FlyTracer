@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 #include "Mesh.h"
+#include "temp_file.h"
 #include "test_meshes.h"
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <utility>
@@ -14,12 +14,10 @@ protected:
     Mesh mesh;
 
     // Loads OBJ text from a temporary file
-    bool LoadObj(const std::string& name, const std::string& obj) {
-        const auto path = std::filesystem::temp_directory_path() / name;
-        std::ofstream(path) << obj;
-        const bool loaded = mesh.LoadFromFile(path.string());
-        std::filesystem::remove(path);
-        return loaded;
+    bool LoadObj(const std::string& obj) {
+        const TempFile file(".obj");
+        std::ofstream(file.Path()) << obj;
+        return mesh.LoadFromFile(file.String());
     }
 };
 
@@ -46,6 +44,13 @@ TEST_F(MeshTest, AddVertex) {
     EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e021(), 3.0f);
 }
 
+TEST_F(MeshTest, AddVertexStoresWeightOne) {
+    mesh.AddVertex({.position = TriVector(2.0f, 4.0f, 6.0f, 2.0f)});
+    EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e032(), 1.0f);
+    EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e021(), 3.0f);
+    EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e123(), 1.0f);
+}
+
 TEST_F(MeshTest, AddTriangle) {
     for (int i = 0; i < 3; ++i) {
         mesh.AddVertex({.position = TriVector(static_cast<float>(i), 0.0f, 0.0f, 1.0f)});
@@ -63,10 +68,14 @@ TEST_F(MeshTest, Clear) {
     mesh.AddVertex({});
     mesh.AddTriangle({{0, 0, 0}});
 
+    mesh.BuildBVH();
+
     mesh.Clear();
 
     EXPECT_TRUE(mesh.Vertices().empty());
     EXPECT_TRUE(mesh.Triangles().empty());
+    EXPECT_TRUE(mesh.GetBVH().nodes.empty());
+    EXPECT_TRUE(mesh.GetBVH().primitiveOrder.empty());
 }
 
 TEST_F(MeshTest, AddMaterial) {
@@ -161,7 +170,7 @@ TEST(MeshMaterialTest, RoughnessFromShininess) {
 
 // Corners that repeat the same position and texture coordinate share a vertex
 TEST_F(MeshTest, LoadSharesRepeatedCorners) {
-    ASSERT_TRUE(LoadObj("flytracer_quad.obj",
+    ASSERT_TRUE(LoadObj(
         "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\n"
         "vt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\n"
         "f 1/1 2/2 3/3\nf 1/1 3/3 4/4\n"));
@@ -170,10 +179,20 @@ TEST_F(MeshTest, LoadSharesRepeatedCorners) {
     EXPECT_EQ(mesh.TriangleCount(), 2u);
 }
 
+// A face that refers to a missing position or texture coordinate fails the load and keeps the mesh
+TEST_F(MeshTest, LoadRejectsMissingVertices) {
+    ASSERT_TRUE(LoadObj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"));
+
+    EXPECT_FALSE(LoadObj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 4\n"));
+    EXPECT_FALSE(LoadObj("v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nf 1/1 2/1 3/2\n"));
+    EXPECT_EQ(mesh.VertexCount(), 3u);
+    EXPECT_EQ(mesh.TriangleCount(), 1u);
+}
+
 // A texture seam splits a vertex, but the computed normals of both halves are the same:
 // the angle-weighted normal of the fold between a +z and a +y face
 TEST_F(MeshTest, LoadSplitsTextureSeams) {
-    ASSERT_TRUE(LoadObj("flytracer_seam.obj",
+    ASSERT_TRUE(LoadObj(
         "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 1 0 -1\n"
         "vt 0 0\nvt 1 0\nvt 0 1\nvt 0.5 0.5\n"
         "f 1/1 2/2 3/3\nf 1/4 2/2 4/3\n"));
@@ -274,6 +293,24 @@ TEST(MeshMeasuresTest, TetrahedronCenterOfMass) {
     EXPECT_NEAR(center.e032(), 0.25f, 1e-6f);
     EXPECT_NEAR(center.e013(), 0.25f, 1e-6f);
     EXPECT_NEAR(center.e021(), 0.25f, 1e-6f);
+}
+
+// The center does not depend on the size of the solid, however small its homogeneous weights get
+TEST(MeshMeasuresTest, TinyBoxCenterOfMass) {
+    const Mesh box = MakeBox(1e-5f, 1e-5f, 1e-5f, TranslationMotor(2e-5f, 3e-5f, 4e-5f));
+    const TriVector center = box.CenterOfMass();
+    EXPECT_FLOAT_EQ(center.e123(), 1.0f);
+    EXPECT_NEAR(center.e032(), 2e-5f, 1e-9f);
+    EXPECT_NEAR(center.e013(), 3e-5f, 1e-9f);
+    EXPECT_NEAR(center.e021(), 4e-5f, 1e-9f);
+}
+
+TEST(MeshMeasuresTest, FlatMeshCenterOfMassIsItsBoundsCenter) {
+    const Mesh triangle = MakeMesh({TriVector(0, 0, 0), TriVector(2, 0, 0), TriVector(0, 4, 0)}, {{0, 1, 2}});
+    const TriVector center = triangle.CenterOfMass();
+    EXPECT_FLOAT_EQ(center.e032(), 1.0f);
+    EXPECT_FLOAT_EQ(center.e013(), 2.0f);
+    EXPECT_FLOAT_EQ(center.e123(), 1.0f);
 }
 
 TEST(MeshMeasuresTest, ReversedWindingNegatesVolume) {
