@@ -80,13 +80,13 @@ int main(int argc, char* argv[]) {
             const std::string_view arg = argv[i];
 
             if (arg == "--width" && i + 1 < argc) {
-                if (FlyTracer::parseNumber(argv[++i], config.windowWidth) && config.windowWidth > 0) {
+                if (FlyTracer::parseNumber(argv[++i], config.windowWidth, 1, FlyTracer::AppConfig::kMaxWindowSize)) {
                     benchmarkExtent.width = static_cast<uint32_t>(config.windowWidth);
                 } else {
                     std::cerr << "Invalid width value, using default\n";
                 }
             } else if (arg == "--height" && i + 1 < argc) {
-                if (FlyTracer::parseNumber(argv[++i], config.windowHeight) && config.windowHeight > 0) {
+                if (FlyTracer::parseNumber(argv[++i], config.windowHeight, 1, FlyTracer::AppConfig::kMaxWindowSize)) {
                     benchmarkExtent.height = static_cast<uint32_t>(config.windowHeight);
                 } else {
                     std::cerr << "Invalid height value, using default\n";

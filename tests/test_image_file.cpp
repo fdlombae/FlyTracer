@@ -1,25 +1,19 @@
 #include <gtest/gtest.h>
 #include "ImageFile.h"
+#include "temp_file.h"
 #include <array>
 #include <cstdint>
 #include <cstring>
-#include <filesystem>
 #include <fstream>
-
-namespace {
-
-const std::filesystem::path kPath = std::filesystem::temp_directory_path() / "flytracer_test_image.png";
-
-}
 
 // Saved RGB pixels come back as RGBA bytes in that order, with an opaque alpha
 TEST(ImageFileTest, LoadsPngAsRgba) {
     std::array<uint8_t, 6> rgb{255, 0, 0, 0, 128, 255};
     const SurfacePtr source(SDL_CreateSurfaceFrom(2, 1, SDL_PIXELFORMAT_RGB24, rgb.data(), 6), SDL_DestroySurface);
-    ASSERT_TRUE(SDL_SavePNG(source.get(), kPath.string().c_str()));
+    const TempFile file(".png");
+    ASSERT_TRUE(SDL_SavePNG(source.get(), file.String().c_str()));
 
-    const SurfacePtr image = LoadRgbaPng(kPath.string());
-    std::filesystem::remove(kPath);
+    const SurfacePtr image = LoadRgbaPng(file.String());
     ASSERT_TRUE(image);
     EXPECT_EQ(image->w, 2);
     EXPECT_EQ(image->h, 1);
@@ -29,8 +23,8 @@ TEST(ImageFileTest, LoadsPngAsRgba) {
 }
 
 TEST(ImageFileTest, MissingOrInvalidFileIsNull) {
-    EXPECT_FALSE(LoadRgbaPng((std::filesystem::temp_directory_path() / "flytracer_missing.png").string()));
-    std::ofstream(kPath) << "not a png";
-    EXPECT_FALSE(LoadRgbaPng(kPath.string()));
-    std::filesystem::remove(kPath);
+    const TempFile file(".png");
+    EXPECT_FALSE(LoadRgbaPng(file.String()));
+    std::ofstream(file.Path()) << "not a png";
+    EXPECT_FALSE(LoadRgbaPng(file.String()));
 }

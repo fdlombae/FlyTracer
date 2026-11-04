@@ -106,6 +106,17 @@ bool Mesh::LoadFromFile(const std::string& filename) {
     if (!warn.empty()) {
         std::cout << "Warning loading " << filename << ": " << warn << std::endl;
     }
+    // tinyobjloader only warns about positions and texture coordinates that do not exist
+    const auto validIndex = [](const tinyobj::index_t& index, const tinyobj::attrib_t& attrib) {
+        return index.vertex_index >= 0 && static_cast<size_t>(index.vertex_index) < attrib.vertices.size() / 3 &&
+               (index.texcoord_index < 0 || static_cast<size_t>(index.texcoord_index) < attrib.texcoords.size() / 2);
+    };
+    for (const auto& shape : shapes) {
+        if (!std::ranges::all_of(shape.mesh.indices, [&](const auto& index) { return validIndex(index, attrib); })) {
+            std::cerr << "Failed to load " << filename << ": a face refers to a missing vertex" << std::endl;
+            return false;
+        }
+    }
 
     Clear();
     // OBJ materials become PBR materials
@@ -125,10 +136,8 @@ bool Mesh::LoadFromFile(const std::string& filename) {
     std::map<std::array<int, 3>, uint32_t> vertexMap;
     const auto vertexOf = [&](const tinyobj::index_t& index) {
         Vertex vertex{};
-        if (index.vertex_index >= 0) {
-            const float* p = &attrib.vertices[3 * index.vertex_index];
-            vertex.position = TriVector(p[0], p[1], p[2]);
-        }
+        const float* p = &attrib.vertices[3 * index.vertex_index];
+        vertex.position = TriVector(p[0], p[1], p[2]);
         // Some OBJ files reference normals (f v/vt/vn) without defining them (no vn lines)
         if (index.normal_index >= 0 && static_cast<size_t>(3 * index.normal_index + 2) < attrib.normals.size()) {
             const float* n = &attrib.normals[3 * index.normal_index];
@@ -175,6 +184,7 @@ bool Mesh::LoadFromFile(const std::string& filename) {
 }
 
 void Mesh::Clear() {
+    m_bvh = {};
     m_vertices.clear();
     m_triangles.clear();
     m_materials.clear();
