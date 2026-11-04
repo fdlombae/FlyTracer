@@ -4,33 +4,32 @@ FlyTracer uses **Projective Geometric Algebra (PGA)** for 3D transformations via
 
 ## Why PGA?
 
-PGA provides elegant representations for:
+PGA provides one algebra for:
 
-- **Points** as TriVectors (trivectors)
+- **Points** as TriVectors
 - **Planes** as Vectors
-- **Lines** as BiVectors (bivectors)
-- **Transformations** as Motors (combined rotation + translation)
+- **Lines** as BiVectors
+- **Transformations** as Motors (rotation + translation) and planes (reflections)
 
-All transformations use the same "sandwich product" pattern: `M * object * ~M`
+All transformations use the same **sandwich product**: `X' = M X ~M`. FlyTracer uses it everywhere, including on the GPU: mesh instances are sent to the shader as motors, not matrices.
 
 ## Core Types
 
-### TriVector (Points)
+### TriVector (Points and Directions)
 
-Points in 3D space are represented as **TriVectors** with homogeneous coordinates.
+Points have homogeneous weight `e123 = 1`; directions (ideal points, "points at infinity") have `e123 = 0`.
 
 ```cpp
-// Create a point at (x, y, z)
-TriVector point(x, y, z);
+TriVector point(x, y, z);                // A point (e123 = 1)
+TriVector direction(dx, dy, dz, 0.0f);   // A direction
 
-// Access coordinates
 float x = point.e032();  // x coordinate
 float y = point.e013();  // y coordinate
 float z = point.e021();  // z coordinate
 ```
 
 !!! note "Coordinate Names"
-    The names `e032`, `e013`, `e021` come from the PGA basis elements. Just remember:
+    The names `e032`, `e013`, `e021` come from the PGA basis elements:
 
     - `e032()` → X
     - `e013()` → Y
@@ -38,185 +37,109 @@ float z = point.e021();  // z coordinate
 
 ### Vector (Planes)
 
-Planes are represented as **Vectors** with components `(d, nx, ny, nz)`.
+`Vector(e0, e1, e2, e3)` is the plane `e1*x + e2*y + e3*z + e0 = 0`, with normal `(e1, e2, e3)`.
 
 ```cpp
-// Plane: nx*x + ny*y + nz*z = d
-// Vector(d, nx, ny, nz)
-
-// Floor plane (y = 0, normal pointing up)
-Vector floor(0.0f, 0.0f, 1.0f, 0.0f);
-
-// Wall at x = 5 (normal pointing in -X direction)
-Vector wall(5.0f, -1.0f, 0.0f, 0.0f);
-
-// Ceiling at y = 10 (normal pointing down)
-Vector ceiling(10.0f, 0.0f, -1.0f, 0.0f);
+Vector floor(0.0f, 0.0f, 1.0f, 0.0f);     // y = 0
+Vector wall(-5.0f, 1.0f, 0.0f, 0.0f);     // x = 5
+Vector ceiling(10.0f, 0.0f, -1.0f, 0.0f); // y = 10, normal pointing down
 ```
 
-### BiVector (Axes/Lines)
+### BiVector (Lines)
 
-BiVectors represent lines and rotation axes. For rotations, you typically use axis-aligned bivectors:
+BiVectors are lines in Plücker coordinates: `BiVector(e01, e02, e03, e23, e31, e12)`, with direction `(e23, e31, e12)`. The easiest way to make one is the **join** (`&`) of two points, or of a point and a direction:
 
 ```cpp
-// Rotation axes (moment part only, no position offset)
-BiVector xAxis(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);  // X axis
-BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);  // Y axis
-BiVector zAxis(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);  // Z axis
+BiVector xAxis(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);  // The x axis through the origin
+BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+BiVector zAxis(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+BiVector line = TriVector(1.0f, 2.0f, 3.0f) & TriVector(4.0f, 2.0f, 3.0f);
+BiVector throughPoint = TriVector(1.0f, 2.0f, 3.0f) & TriVector(0.0f, 1.0f, 0.0f, 0.0f);  // Vertical line
 ```
+
+The **meet** (`^`) of two planes is their line of intersection.
 
 ### Motor (Transformations)
 
-Motors combine rotation and translation into a single transformation.
-
 ```cpp
-// Identity motor (no transformation)
-Motor M;
+// Identity motor
+Motor identity{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
-// Translation only
-Motor T = Motor::Translation(dx, dy, dz);
+// Translation by (dx, dy, dz)
+Motor T = TranslationMotor(dx, dy, dz);
 
-// Rotation only (angle in degrees)
-BiVector axis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);  // Y axis
-Motor R = Motor::Rotation(45.0f, axis);
+// Rotation by an angle in degrees around a line
+Motor R = Motor::Rotation(45.0f, yAxis);
 
-// Combined: rotate then translate
-Motor combined = T * R;  // R applied first, then T
+// Combined: the rightmost motor acts first
+Motor combined = T * R;  // Rotate around the y axis, then translate
 ```
+
+`TranslationMotor`, `ApplyMotor` (for points and planes), `ReflectInPlane`, `ReflectionMotor`, `MotorPower`, `NormalizedMotor` and `Euclidean` are small helpers in `PGA.h`.
 
 ## Transforming Objects
 
-All transformations use the **sandwich product**: `M * object * ~M`
-
-The `~M` is the **reverse** of the motor (conjugate).
-
-### Transforming Points
+### Points
 
 ```cpp
-// Create a point
 TriVector point(1.0f, 2.0f, 3.0f);
-
-// Create a rotation around Y axis
-BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 Motor R = Motor::Rotation(90.0f, yAxis);
 
-// Transform the point
-TriVector rotated = (R * point * ~R).Grade3();
+TriVector rotated = ApplyMotor(R, point);    // (R * point * ~R).Grade3(), normalized
 ```
 
-!!! warning "Grade Extraction"
-    After the sandwich product, call `.Grade3()` to extract the TriVector result.
-
-### Transforming Spheres
+### Spheres
 
 Sphere centers are TriVectors:
 
 ```cpp
-void MyScene::onUpdate(float deltaTime) {
-    BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    Motor R = Motor::Rotation(deltaTime * 30.0f, yAxis);  // 30 deg/s
-
-    if (auto* sphere = getSphere(m_sphereId)) {
-        TriVector center = sphere->getCenter();
-        TriVector newCenter = (R * center * ~R).Grade3();
-        sphere->setCenter(newCenter);
+void MyScene::OnUpdate(float deltaTime) {
+    const Motor R = Motor::Rotation(deltaTime * 30.0f, yAxis);  // 30 degrees per second
+    if (auto* sphere = GetSphere(m_sphereId)) {
+        sphere->center = ApplyMotor(R, sphere->center);
     }
 }
 ```
 
-### Transforming Mesh Instances
+### Mesh Instances
 
-Mesh instances store their transform as a Motor:
+Mesh instances store their transform as a motor (plus a uniform scale and an optional mirror plane):
 
 ```cpp
-void MyScene::onUpdate(float deltaTime) {
-    BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    Motor R = Motor::Rotation(deltaTime * 45.0f, yAxis);
-
-    if (auto* instance = findInstance("myMesh")) {
-        // Compose rotation with existing transform
-        instance->transform = R * instance->transform;
+void MyScene::OnUpdate(float deltaTime) {
+    const Motor R = Motor::Rotation(deltaTime * 45.0f, yAxis);
+    if (auto* instance = FindInstance("myMesh")) {
+        instance->transform = R * instance->transform;  // Rotate around the world's y axis
     }
 }
 ```
 
-## Common Operations
+## Reflections
 
-### Position a Mesh
-
-```cpp
-// Just translation
-Motor position = Motor::Translation(5.0f, 0.0f, -3.0f);
-addMeshInstance(meshId, position);
-
-// Or use TriVector directly
-addMeshInstance(meshId, TriVector(5.0f, 0.0f, -3.0f));
-```
-
-### Rotate and Position
+A plane reflects points with the same sandwich product: `P X ~P`. Two reflections make a motor: reflecting in plane `a` and then in plane `b` is the motor `b * a` (a rotation around their line of intersection by twice the angle between them, or a translation by twice their distance when they are parallel).
 
 ```cpp
-BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-Motor R = Motor::Rotation(45.0f, yAxis);
-Motor T = Motor::Translation(5.0f, 0.0f, 0.0f);
-
-// Rotate first, then move
-Motor transform = T * R;
-addMeshInstance(meshId, transform);
+TriVector mirrored = ReflectInPlane(wall, point);
+Motor twice = ReflectionMotor(first, second);  // second * first: reflect in first, then in second
 ```
 
-### Orbit Animation
+## On the GPU
 
-```cpp
-void MyScene::onUpdate(float deltaTime) {
-    m_angle += deltaTime;  // radians per second
-
-    float radius = 10.0f;
-    float x = std::cos(m_angle) * radius;
-    float z = std::sin(m_angle) * radius;
-
-    // Position on circle
-    TriVector pos(x, 5.0f, z);
-
-    // Also face the center (optional)
-    float facingAngle = -m_angle * 57.3f;  // Convert to degrees
-    BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    Motor R = Motor::Rotation(facingAngle, yAxis);
-    Motor T = Motor::Translation(x, 5.0f, z);
-
-    setInstanceTransform(m_instanceId, T * R);
-}
-```
-
-### Incremental Rotation
-
-For smooth continuous rotation, apply small rotations each frame:
-
-```cpp
-void MyScene::onUpdate(float deltaTime) {
-    float degreesPerSecond = 45.0f;
-    float angleDeg = degreesPerSecond * deltaTime;
-
-    BiVector yAxis(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
-    Motor R = Motor::Rotation(angleDeg, yAxis);
-
-    if (auto* instance = findInstance("spinner")) {
-        instance->transform = R * instance->transform;
-    }
-}
-```
+The raytracer uses the same algebra: `engine/shaders/flyfish.glsl` has FlyFish's types and operations in GLSL (`join` for `&`, `meet` for `^`, `inner` for `|`, `sandwich` for `M X ~M`, ...). Mesh instances reach the shader as motors, and rays enter an instance's object space with the reverse motor `~M` (and the mirror, which is its own inverse). See [The PGA Raytracer](pga-tracer.md) for how it traces rays with lines, planes and motors.
 
 ## Quick Reference
 
 | Type | Represents | Create | Common Use |
 |------|------------|--------|------------|
-| `TriVector` | Point | `TriVector(x, y, z)` | Positions, sphere centers |
-| `Vector` | Plane | `Vector(d, nx, ny, nz)` | Floor, walls, clipping planes |
-| `BiVector` | Line/Axis | `BiVector(...)` | Rotation axes |
-| `Motor` | Transform | `Motor::Translation()`, `Motor::Rotation()` | Moving/rotating objects |
+| `TriVector` | Point / direction | `TriVector(x, y, z)`, `TriVector(x, y, z, 0)` | Positions, sphere centers, light directions |
+| `Vector` | Plane | `Vector(e0, nx, ny, nz)` | Floors, walls, mirrors |
+| `BiVector` | Line | `point & point` | Rotation axes |
+| `Motor` | Rigid motion | `TranslationMotor()`, `Motor::Rotation()` | Moving and rotating objects |
 
 ## Further Reading
 
+- [The PGA Raytracer](pga-tracer.md) - How FlyTracer traces rays with lines, planes and motors
 - [FlyFish Library](https://github.com/fdlombae/FlyFish) - The PGA library used by FlyTracer
 - [Geometric Algebra Primer](https://bivector.net/PGA4CS.html) - PGA for Computer Scientists
 - [ganja.js](https://enkimute.github.io/ganja.js/) - Interactive PGA visualizations

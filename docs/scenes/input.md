@@ -1,48 +1,43 @@
 # Input Handling
 
-The `onInput` method receives an `InputState` struct every frame with the current state of mouse and keyboard.
+`OnInput` receives an `Input` object every frame with the state of the mouse and keyboard.
 
-## InputState Structure
+## Keys and Buttons
 
 ```cpp
-struct InputState {
-    // Mouse buttons
-    bool leftMouseDown{false};
-    bool rightMouseDown{false};
-    bool middleMouseDown{false};
-
-    // Mouse position and movement
-    float mouseX{0.0f};          // Current X position
-    float mouseY{0.0f};          // Current Y position
-    float mouseDeltaX{0.0f};     // Movement since last frame
-    float mouseDeltaY{0.0f};     // Movement since last frame
-    float scrollDelta{0.0f};     // Scroll wheel delta
-
-    // Keyboard
-    bool keyW{false}, keyA{false}, keyS{false}, keyD{false};
-    bool keyQ{false}, keyE{false};
-    bool keyUp{false}, keyDown{false}, keyLeft{false}, keyRight{false};
-
-    // Timing
-    float deltaTime{0.0f};       // Time since last frame
-};
+input.IsDown(Key::W)                // Held down this frame
+input.WasPressed(Key::Space)        // Went down this frame: use this for toggles and actions
+input.IsDown(MouseButton::Right)    // Mouse button held
 ```
 
-## Basic Input Handling
+The available keys are `W A S D Q E`, the arrow keys (`Up Down Left Right`), `Space Shift Ctrl Alt Escape`, `H R P G V F T L` and the digits `Num0` to `Num9`. Escape also closes the application. Keys are released automatically when the window loses focus.
+
+While an ImGui widget has keyboard focus (e.g. a text field), letter and digit keys go to ImGui instead of the scene; arrows and modifiers always reach the scene.
+
+## Mouse and Time
+
+| Function | Description |
+|----------|-------------|
+| `MouseX()`, `MouseY()` | Mouse position in window points |
+| `MouseDeltaX()`, `MouseDeltaY()` | Movement since the last frame |
+| `ScrollDelta()` | Scroll wheel movement since the last frame |
+| `DeltaTime()` | Seconds since the last frame |
+
+## Example
 
 ```cpp
-void MyScene::OnInput(const InputState& input) {
-    // Check mouse buttons
-    if (input.leftMouseDown) {
-        // Left mouse is held
+void MyScene::OnInput(const Input& input) {
+    if (input.WasPressed(Key::P)) {
+        m_paused = !m_paused;
     }
 
-    // Check keys
-    if (input.keyW) {
-        // W is pressed
-    }
+    // Frame-rate independent movement
+    const float step = 10.0f * input.DeltaTime();
+    if (input.IsDown(Key::W)) m_position += step;
+    if (input.IsDown(Key::S)) m_position -= step;
 
-    // Use delta time for frame-independent movement
-    float moveSpeed = 10.0f * input.deltaTime;
+    if (input.IsDown(MouseButton::Left)) {
+        m_angle += input.MouseDeltaX() * 0.01f;
+    }
 }
 ```

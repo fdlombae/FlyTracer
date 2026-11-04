@@ -1,40 +1,36 @@
 # Camera
 
-FlyTracer uses a simple **eye-target-up** camera model with PGA TriVectors for positions.
-
-## Camera Properties
-
-| Property | Type | Description                                              |
-|----------|------|----------------------------------------------------------|
-| `m_cameraEye` | `TriVector` | Camera position in world space                           |
-| `m_cameraTarget` | `TriVector` | Point the camera looks at                                |
-| `m_cameraUp` | `TriVector` | Up direction (usually Y-axis), ideal point with e123 = 0 |
-| `m_cameraFov` | `float` | Field of view in degrees                                 |
+FlyTracer uses a simple **eye-target-up** pinhole camera with PGA TriVectors: the eye and target are points (e123 = 1), the up hint is a direction (an ideal point, e123 = 0).
 
 ## Setting the Camera
 
-### In OnInit
-
 ```cpp
-void MyScene::OnInit(VulkanRenderer* renderer) {
-    // Position camera
-    m_cameraEye = TriVector(0.0f, 5.0f, 15.0f);     // Behind and above
-    m_cameraTarget = TriVector(0.0f, 2.0f, 0.0f);   // Look at center
-    m_cameraUp = TriVector(0.0f, 1.0f, 0.0f);       // Y is up
+void MyScene::OnInit() {
+    SetCamera(TriVector(0.0f, 5.0f, 15.0f),        // Eye: behind and above
+              TriVector(0.0f, 2.0f, 0.0f),         // Target: look at the center
+              TriVector(0.0f, 1.0f, 0.0f, 0.0f));  // Up direction (optional, Y is the default)
 
-    // Optional: adjust FOV (default is 45)
-    m_cameraFov = 60.0f;
+    SetCameraFov(60.0f);  // Vertical field of view in degrees, default 45
+    SetExposure(1.2f);    // Brightness before tone mapping, default 1
 }
 ```
 
-### Using SetCamera
+The camera can be changed at any time, for example every frame in `OnInput` or `OnUpdate`. When the camera stays the same, the raytracer keeps averaging new samples into the image (anti-aliasing and smooth glossy reflections); moving it restarts the average.
+
+## Orbit Camera
+
+`OrbitCamera` (in `OrbitCamera.h`) circles a target point: drag with the right mouse button to orbit, scroll to zoom. Its eye position is the point at `distance` behind the target, rotated by motors for pitch (around x) and yaw (around y) and translated to the target.
 
 ```cpp
-SetCamera(
-    TriVector(eyeX, eyeY, eyeZ),
-    TriVector(targetX, targetY, targetZ),
-    TriVector(upX, upY, upZ)
-);
+#include "OrbitCamera.h"
 
-SetCameraFov(75.0f);
+class MyScene : public GameScene {
+    // Target, yaw, pitch, distance, minimum and maximum distance
+    OrbitCamera m_orbit{TriVector(0.0f, 2.0f, 0.0f), 0.0f, 0.3f, 20.0f, 5.0f, 60.0f};
+
+    void OnInput(const Input& input) override {
+        m_orbit.HandleInput(input);
+        SetCamera(m_orbit.Eye(), m_orbit.target);
+    }
+};
 ```

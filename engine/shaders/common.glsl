@@ -1,172 +1,137 @@
-// Common types and constants for the raytracer
-// GPU structures match FlyFish PGA types for easy CPU-GPU data sharing
+// Constants and the GPU structs, laid out like engine/include/GpuScene.h: std430, and scalar block
+// layout for the mesh records and BVH nodes
 
 #ifndef COMMON_GLSL
 #define COMMON_GLSL
 
-// Constants
-const float PI = 3.14159265359;
-const float EPSILON = 0.0001;
-const float SHADOW_BIAS = 0.01;
-const float MAX_DIST = 1000000.0;
+#include "ShaderInterface.h"
 
-// Light types
+const float PI = 3.14159265359;
+const float INFINITY = 1e30;
+
+const int SHADING_FLAT = 0;
+const int SHADING_LAMBERT = 1;
+const int SHADING_PHONG = 2;
+const int SHADING_PBR = 3;
+
 const int LIGHT_DIRECTIONAL = 0;
 const int LIGHT_POINT = 1;
 const int LIGHT_SPOT = 2;
 
-// Primitive types
-const int PRIMITIVE_TRIANGLE = 0;
-const int PRIMITIVE_SPHERE = 1;
-const int PRIMITIVE_PLANE = 2;
-
-// Shading modes
-const int SHADING_FLAT = 0;     // Just color, no lighting
-const int SHADING_LAMBERT = 1; // Basic diffuse (Lambertian)
-const int SHADING_PHONG = 2;   // Diffuse + specular (Blinn-Phong)
-const int SHADING_PBR = 3;     // Full PBR (Cook-Torrance)
-
-// Vertex structure (32 bytes) - matches GPUVertex from C++
-// Optimized layout: position.xyz + u packed together, normal.xyz + v packed together
-// This saves 16 bytes per vertex (33% memory reduction)
 struct Vertex {
-    vec4 positionU;     // x, y, z, texture_u
-    vec4 normalV;       // nx, ny, nz, texture_v
+    vec4 positionU;  // xyz: object-space position, w: texture u
+    vec4 normalV;    // xyz: object-space normal, w: texture v
 };
 
-// Triangle structure
 struct Triangle {
     uint indices[3];
     uint materialIndex;
 };
 
-// BVH Node structure (32 bytes)
-struct BVHNode {
-    vec3 minBounds;
-    int leftFirst;
-    vec3 maxBounds;
-    int triCount;
-};
-
-// Material structure (32 bytes) - matches GPUMaterial from C++
-// NOTE: Uses individual floats instead of vec3 to match C++ float[3] layout
-// (vec3 in std430 aligns to 16 bytes, but float[3] is only 12 bytes)
 struct Material {
-    // 16 bytes: diffuse RGB + shininess (packed tightly)
-    float diffuse_r, diffuse_g, diffuse_b;
-    float shininess;
-    // 16 bytes: shading mode + texture index + PBR params
+    vec3 color;  // Linear
     int shadingMode;
-    int diffuseTextureIndex;
-    float metalness;      // PBR: 0 = dielectric, 1 = metal
-    float roughness;      // PBR: 0 = smooth, 1 = rough
+    float metallic;
+    float roughness;
+    float shininess;
+    float reflectivity;
+    int textureIndex;  // -1: untextured
+    float specular;
 };
 
-// Sphere primitive - PGA TriVector representation (48 bytes)
-// Layout matches FlyFish TriVector [e032=x, e013=y, e021=z, e123=radius]
-// Must match C++ GPUSphere layout exactly
 struct Sphere {
-    float center_x, center_y, center_z;  // 12 bytes - e032, e013, e021 components
-    float radius;                         // 4 bytes - e123 component (repurposed for radius) (16 total)
-    float color_r, color_g, color_b;     // 12 bytes
-    float shininess;                      // 4 bytes (32 total)
-    float reflectivity;                   // 4 bytes
-    int shadingMode;                      // 4 bytes
-    float metalness;                      // 4 bytes - PBR
-    float roughness;                      // 4 bytes (48 total) - PBR
+    vec3 center;
+    float radius;
+    uint materialIndex;
 };
 
-// Plane primitive (48 bytes)
-// Layout: normal + distance, color + padding, reflectivity/mode/PBR
-// Must match C++ GPUPlane layout exactly
+// dot(normal, x) + e0 = 0
 struct Plane {
-    float normal_x, normal_y, normal_z;  // 12 bytes - plane normal
-    float distance;                       // 4 bytes - signed distance from origin (16 total)
-    float color_r, color_g, color_b;     // 12 bytes
-    float _padding;                       // 4 bytes (32 total)
-    float reflectivity;                   // 4 bytes
-    int shadingMode;                      // 4 bytes
-    float metalness;                      // 4 bytes - PBR
-    float roughness;                      // 4 bytes (48 total) - PBR
+    vec3 normal;
+    float e0;
+    uint materialIndex;
 };
 
-// Light structure (64 bytes)
-// Optimized layout: pack related data into vec4s to eliminate padding waste
-// Must match C++ GPULight layout exactly
 struct Light {
-    // vec4: position.xyz + type (as float)
-    float position_x, position_y, position_z;   // 12 bytes
-    float type;                                  // 4 bytes (16 total)
-    // vec4: direction.xyz + range
-    float direction_x, direction_y, direction_z; // 12 bytes
-    float range;                                 // 4 bytes (32 total)
-    // vec4: color.rgb + intensity
-    float color_r, color_g, color_b;            // 12 bytes
-    float intensity;                             // 4 bytes (48 total)
-    // vec4: spot parameters + padding
-    float spotAngle;                             // 4 bytes
-    float spotSoftness;                          // 4 bytes
-    float _pad0, _pad1;                          // 8 bytes (64 total)
+    vec3 position;
+    int type;
+    vec3 direction;  // Direction the light travels
+    float range;     // Falloff range^2 / (range^2 + distance^2)
+    vec3 color;      // Linear color times intensity
+    float spotCosOuter;
+    float spotCosInner;
 };
 
-// Ray structure
-struct Ray {
-    vec3 origin;
+// Motor (rotor: s, e23, e31, e12; dual: e01, e02, e03, e0123), uniform scale and an optional mirror plane
+struct MeshInstance {
+    vec4 rotor;
+    vec4 dual;
+    vec4 mirror;
+    float scale;
+    uint meshId;
+    uint hasMirror;
+};
+
+struct DebugLine {
+    vec4 from;
+    vec4 to;
+    vec4 color;
+};
+
+// "A Fast and Robust Method for Avoiding Self-Intersection" (Wächter and Binder, Ray Tracing Gems
+// ch. 6): moves a point off the surface by a few float ULPs, so the offset scales with the coordinates
+vec3 offsetRayOrigin(vec3 position, vec3 normal) {
+    const float originThreshold = 1.0 / 32.0;
+    const float floatScale = 1.0 / 65536.0;
+    const float intScale = 256.0;
+
+    ivec3 intOffset = ivec3(intScale * normal);
+    vec3 offsetPosition = vec3(
+        intBitsToFloat(floatBitsToInt(position.x) + (position.x < 0.0 ? -intOffset.x : intOffset.x)),
+        intBitsToFloat(floatBitsToInt(position.y) + (position.y < 0.0 ? -intOffset.y : intOffset.y)),
+        intBitsToFloat(floatBitsToInt(position.z) + (position.z < 0.0 ? -intOffset.z : intOffset.z)));
+    // Near the origin a ULP is tiny, so use a small absolute offset there instead
+    return mix(offsetPosition, position + floatScale * normal, lessThan(abs(position), vec3(originThreshold)));
+}
+
+// What the closest-hit search records; surface attributes are only computed for the final hit
+const uint HIT_NONE = 0u;
+const uint HIT_SPHERE = 1u;
+const uint HIT_PLANE = 2u;
+const uint HIT_TRIANGLE = 3u;
+
+struct Hit {
+    float t;
+    uint type;
+    uint index;      // Sphere, plane or triangle
+    uint instance;   // Triangles only
+    vec2 barycentrics;
+};
+
+// An edge from anchor to anchor + direction, stored once for all triangles that share it
+struct Edge {
+    vec3 anchor;
     vec3 direction;
 };
 
-// Mesh instance - transform for instanced rendering
-struct MeshInstance {
-    mat4 transform;       // Object-to-world transform
-    mat4 invTransform;    // World-to-object transform (for ray transformation)
-    uint meshId;          // Which mesh this instance uses
-    uint visible;         // Visibility flag (0 or 1)
-    vec2 _pad;
+// The edges opposite the three corners, and the triangle for shading
+struct EdgeTriangle {
+    uint edges[3];
+    uint triangle;
 };
 
-// Texture info - per-texture metadata for multi-texture support (16 bytes)
-struct TextureInfo {
-    uint offset;            // Offset into texture data buffer (in vec4 pixels)
-    uint width;             // Texture width
-    uint height;            // Texture height
-    uint _pad;              // Padding to 16 bytes
+// The bounding box of everything below a node
+struct Box {
+    vec3 minimum;
+    vec3 maximum;
 };
 
-// Mesh info - per-mesh offsets for multi-mesh support (32 bytes)
-struct MeshInfo {
-    uint vertexOffset;      // Offset into vertex buffer
-    uint triangleOffset;    // Offset into triangle buffer
-    uint bvhNodeOffset;     // Offset into BVH node buffer
-    uint bvhTriIdxOffset;   // Offset into BVH triangle index buffer
-    uint triangleCount;     // Number of triangles in this mesh
-    uint bvhNodeCount;      // Number of BVH nodes in this mesh
-    uvec2 _pad;             // Padding to 32 bytes
+// A BVH node pair: both children of an internal node. A child with count > 0 is a leaf with count
+// records from index on, with count 0 an internal node whose pair is index, with count -1 missing.
+struct NodePair {
+    Box boxes[2];
+    ivec2 index;
+    ivec2 count;
 };
-
-// Hit information
-struct HitInfo {
-    bool hit;
-    float t;
-    vec3 position;
-    vec3 normal;
-    vec2 uv;
-    uint triangleIndex;
-    uint materialIndex;
-    int primitiveType;
-    uint instanceIndex;   // Which instance was hit
-};
-
-// Vertex accessor functions (optimized 32-byte layout)
-vec3 getVertexPosition(Vertex vtx) {
-    return vtx.positionU.xyz;
-}
-
-vec3 getVertexNormal(Vertex vtx) {
-    return vtx.normalV.xyz;
-}
-
-vec2 getVertexTexCoord(Vertex vtx) {
-    return vec2(vtx.positionU.w, vtx.normalV.w);
-}
 
 #endif // COMMON_GLSL
