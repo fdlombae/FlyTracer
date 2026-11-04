@@ -129,7 +129,7 @@ bool Mesh::LoadFromFile(const std::string& filename) {
         }
     }
     if (m_materials.empty()) {
-        m_materials.push_back(Scene::Material::PBR(Scene::Color(0.8f, 0.8f, 0.8f)));
+        m_materials.push_back(Scene::Material::Default());
     }
 
     // Face corners with the same position, texture coordinate and normal indices share a vertex
@@ -188,6 +188,11 @@ void Mesh::Clear() {
     m_vertices.clear();
     m_triangles.clear();
     m_materials.clear();
+}
+
+void Mesh::AddVertex(const Vertex& vertex) {
+    m_vertices.push_back(vertex);
+    m_vertices.back().position = Euclidean(vertex.position);
 }
 
 void Mesh::ComputeNormals() {
@@ -258,14 +263,18 @@ float Mesh::Volume() const {
     return volume;
 }
 
-// Every tetrahedron's centroid (p0 + p1 + p2 + apex) / 4, weighted by its volume
+// Every tetrahedron's centroid (p0 + p1 + p2 + apex) / 4, weighted by its volume. The offsets of the
+// centroids from the apex are summed, so the result does not depend on the size or position of the solid.
 TriVector Mesh::CenterOfMass() const {
     const TriVector apex = boundsCenter(*this);
-    TriVector weightedSum(0.0f, 0.0f, 0.0f, 0.0f);
+    TriVector weightedOffset(0.0f, 0.0f, 0.0f, 0.0f);
+    float totalVolume = 0.0f;
     forEachTetrahedron(*this, apex, [&](const TriVector& p0, const TriVector& p1, const TriVector& p2, float volume) {
-        weightedSum += (p0 + p1 + p2 + apex) * volume;
+        weightedOffset += (p0 + p1 + p2 - apex * 3.0f) * volume;
+        totalVolume += volume;
     });
-    return Euclidean(weightedSum);
+    if (totalVolume == 0.0f) return apex;
+    return apex + weightedOffset * (1.0f / (4.0f * totalVolume));
 }
 
 // The inertia tensor is a frame of three planes through the origin ("Clean up your Mesh!",

@@ -10,7 +10,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 // A mesh placed in the world. Local points p map to M (scale p) ~M, followed by a
@@ -42,7 +41,8 @@ public:
     GameScene(const GameScene&) = delete;
     GameScene& operator=(const GameScene&) = delete;
 
-    // Called by the engine, these wrap the virtual hooks below
+    // Called by the engine, these wrap the virtual hooks below. Shutdown only calls OnShutdown after a
+    // successful Init, once.
     void Init();
     void HandleInput(const Input& input);
     void Update(float deltaTime);
@@ -72,16 +72,23 @@ protected:
     void SetCameraFov(float fovDegrees) noexcept { m_camera.fov = fovDegrees; }
     void SetExposure(float exposure) noexcept { m_camera.exposure = exposure; }
 
-    // Meshes: loaded once, then placed any number of times as instances.
+    // Meshes: loaded once, then placed any number of times as instances. Their geometry is fixed once
+    // added (add a new mesh instead); only their materials change.
     // Instance and light ids stay valid when others are removed, and are never reused.
     uint32_t LoadMesh(std::string_view objFilename, std::string_view textureFilename = {});
-    // A mesh built in code; its BVH is built here
+    // A mesh built in code; its BVH is built here. Throws std::invalid_argument when a triangle refers
+    // to a missing vertex or material, or a position is not a finite point. A mesh without materials
+    // gets the default material.
     uint32_t AddMesh(std::unique_ptr<Mesh> mesh);
-    [[nodiscard]] Mesh* GetMesh(uint32_t id) noexcept;
+    [[nodiscard]] const Mesh* GetMesh(uint32_t id) const noexcept;
+    // Throws std::out_of_range for an invalid mesh id or material index
+    [[nodiscard]] Scene::Material& GetMeshMaterial(uint32_t meshId, size_t index);
 
     uint32_t AddMeshInstance(uint32_t meshId, const TriVector& position, std::string_view name = {});
     uint32_t AddMeshInstance(uint32_t meshId, const Motor& transform, std::string_view name = {});
     [[nodiscard]] MeshInstance* GetInstance(uint32_t instanceId) noexcept;
+    [[nodiscard]] const MeshInstance* GetInstance(uint32_t instanceId) const noexcept;
+    // The instance added last with this name
     [[nodiscard]] MeshInstance* FindInstance(std::string_view name) noexcept;
     void SetInstanceTransform(uint32_t instanceId, const Motor& transform);
     void SetInstancePosition(uint32_t instanceId, const TriVector& position);
@@ -131,12 +138,12 @@ private:
     std::vector<MeshInstance> m_meshInstances;
     std::vector<uint32_t> m_instanceIds;  // Ascending, one per instance
     uint32_t m_nextInstanceId{0};
-    std::unordered_map<std::string, uint32_t> m_namedInstances;  // Name to instance id
     std::vector<uint32_t> m_lightIds;  // Ascending, one per light in m_sceneData.lights
     uint32_t m_nextLightId{0};
     std::vector<DebugLine> m_debugLines;
     Camera m_camera;
     bool m_debugDrawEnabled{true};
+    bool m_initialized{false};
 
     float m_fps{0.0f};
     float m_fpsAccumulator{0.0f};

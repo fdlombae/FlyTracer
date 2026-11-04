@@ -12,11 +12,6 @@
     return Motor{1.0f, -0.5f * x, -0.5f * y, -0.5f * z, 0.0f, 0.0f, 0.0f, 0.0f};
 }
 
-// Motor translating the origin to the given point
-[[nodiscard]] inline Motor TranslationMotor(const TriVector& position) noexcept {
-    return TranslationMotor(position.e032(), position.e013(), position.e021());
-}
-
 // Motor that reflects in plane `first` and then in plane `second`: the geometric product second * first
 [[nodiscard]] inline Motor ReflectionMotor(const Vector& first, const Vector& second) noexcept {
     return second * first;
@@ -52,6 +47,12 @@
     const float w = point.e123();
     if (std::abs(w) < 1e-12f) return point;
     return TriVector(point.e032() / w, point.e013() / w, point.e021() / w, 1.0f);
+}
+
+// Motor translating the origin to the given point (of any weight)
+[[nodiscard]] inline Motor TranslationMotor(const TriVector& position) noexcept {
+    const TriVector p = Euclidean(position);
+    return TranslationMotor(p.e032(), p.e013(), p.e021());
 }
 
 // The direction of a line, its (e23, e31, e12) part, as an ideal point
@@ -93,8 +94,12 @@
 
 // The rotation around the origin that turns direction `from` into direction `to`, as two reflections:
 // in the plane perpendicular to `from`, which turns it into -from, then in the plane perpendicular to
-// the direction halfway between them. Opposite directions take a half turn around a perpendicular axis.
+// the direction halfway between them. Opposite directions take a half turn around a perpendicular axis,
+// and a zero direction gives the identity.
 [[nodiscard]] inline Motor RotationBetween(const TriVector& from, const TriVector& to) {
+    if (!(from.VNorm() > 0.0f) || !(to.VNorm() > 0.0f)) {
+        return Motor{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    }
     const TriVector origin(0.0f, 0.0f, 0.0f);
     const TriVector a = from * (1.0f / from.VNorm());
     const TriVector halfway = a + to * (1.0f / to.VNorm());

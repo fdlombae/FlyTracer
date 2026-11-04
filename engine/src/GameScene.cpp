@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <utility>
 
@@ -13,6 +14,26 @@ std::optional<size_t> indexOf(const std::vector<uint32_t>& ids, uint32_t id) {
     const auto it = std::ranges::lower_bound(ids, id);
     if (it == ids.end() || *it != id) return std::nullopt;
     return static_cast<size_t>(it - ids.begin());
+}
+
+bool isFinitePoint(const TriVector& point) {
+    return std::ranges::all_of(point, [](float coefficient) { return std::isfinite(coefficient); }) &&
+           point.e123() != 0.0f;
+}
+
+// Checked once, when the mesh is added: the renderer indexes vertices and materials without checks
+void validate(const Mesh& mesh) {
+    if (!std::ranges::all_of(mesh.Vertices(), [](const Vertex& v) { return isFinitePoint(v.position); })) {
+        throw std::invalid_argument("A mesh vertex is not a finite point");
+    }
+    for (const Triangle& triangle : mesh.Triangles()) {
+        if (!std::ranges::all_of(triangle.indices, [&](uint32_t index) { return index < mesh.VertexCount(); })) {
+            throw std::invalid_argument("A mesh triangle refers to a missing vertex");
+        }
+        if (!mesh.HasMaterial(triangle.materialIndex)) {
+            throw std::invalid_argument("A mesh triangle refers to a missing material");
+        }
+    }
 }
 
 }  // namespace
@@ -43,6 +64,7 @@ GameScene::GameScene(std::string resourceDir)
 
 void GameScene::Init() {
     OnInit();
+    m_initialized = true;
 }
 
 void GameScene::HandleInput(const Input& input) {
@@ -60,7 +82,9 @@ void GameScene::DrawGui() {
 }
 
 void GameScene::Shutdown() {
-    OnShutdown();
+    if (std::exchange(m_initialized, false)) {
+        OnShutdown();
+    }
 }
 
 void GameScene::updateFPS(float deltaTime) noexcept {
@@ -104,18 +128,29 @@ uint32_t GameScene::LoadMesh(std::string_view objFilename, std::string_view text
 }
 
 uint32_t GameScene::AddMesh(std::unique_ptr<Mesh> mesh) {
+    if (!mesh) {
+        throw std::invalid_argument("AddMesh requires a mesh");
+    }
+    if (mesh->MaterialCount() == 0) {
+        mesh->AddMaterial(Scene::Material::Default());
+    }
+    validate(*mesh);
     mesh->BuildBVH();
     const auto meshId = static_cast<uint32_t>(m_meshes.size());
     m_meshes.push_back(std::move(mesh));
     return meshId;
 }
 
-Mesh* GameScene::GetMesh(uint32_t id) noexcept {
+const Mesh* GameScene::GetMesh(uint32_t id) const noexcept {
     return id < m_meshes.size() ? m_meshes[id].get() : nullptr;
 }
 
+Scene::Material& GameScene::GetMeshMaterial(uint32_t meshId, size_t index) {
+    return m_meshes.at(meshId)->GetMaterial(index);
+}
+
 uint32_t GameScene::AddMeshInstance(uint32_t meshId, const TriVector& position, std::string_view name) {
-    return AddMeshInstance(meshId, TranslationMotor(Euclidean(position)), name);
+    return AddMeshInstance(meshId, TranslationMotor(position), name);
 }
 
 uint32_t GameScene::AddMeshInstance(uint32_t meshId, const Motor& transform, std::string_view name) {
@@ -126,9 +161,6 @@ uint32_t GameScene::AddMeshInstance(uint32_t meshId, const Motor& transform, std
     const uint32_t instanceId = m_nextInstanceId++;
     m_meshInstances.push_back({.meshId = meshId, .transform = transform, .name = std::string(name)});
     m_instanceIds.push_back(instanceId);
-    if (!name.empty()) {
-        m_namedInstances[std::string(name)] = instanceId;
-    }
     return instanceId;
 }
 
@@ -137,9 +169,16 @@ MeshInstance* GameScene::GetInstance(uint32_t instanceId) noexcept {
     return index ? &m_meshInstances[*index] : nullptr;
 }
 
+const MeshInstance* GameScene::GetInstance(uint32_t instanceId) const noexcept {
+    const auto index = indexOf(m_instanceIds, instanceId);
+    return index ? &m_meshInstances[*index] : nullptr;
+}
+
 MeshInstance* GameScene::FindInstance(std::string_view name) noexcept {
-    const auto it = m_namedInstances.find(std::string(name));
-    return it != m_namedInstances.end() ? GetInstance(it->second) : nullptr;
+    if (name.empty()) return nullptr;
+    const auto named = m_meshInstances | std::views::reverse;
+    const auto it = std::ranges::find(named, name, &MeshInstance::name);
+    return it != named.end() ? &*it : nullptr;
 }
 
 void GameScene::SetInstanceTransform(uint32_t instanceId, const Motor& transform) {
@@ -149,7 +188,7 @@ void GameScene::SetInstanceTransform(uint32_t instanceId, const Motor& transform
 }
 
 void GameScene::SetInstancePosition(uint32_t instanceId, const TriVector& position) {
-    SetInstanceTransform(instanceId, TranslationMotor(Euclidean(position)));
+    SetInstanceTransform(instanceId, TranslationMotor(position));
 }
 
 void GameScene::SetInstanceVisible(uint32_t instanceId, bool visible) {
@@ -164,7 +203,6 @@ bool GameScene::RemoveMeshInstance(uint32_t instanceId) {
 
     m_meshInstances.erase(m_meshInstances.begin() + *index);
     m_instanceIds.erase(m_instanceIds.begin() + *index);
-    std::erase_if(m_namedInstances, [instanceId](const auto& entry) { return entry.second == instanceId; });
     return true;
 }
 
@@ -258,7 +296,7 @@ void GameScene::DrawDebugPoint(const TriVector& point, float size, const Scene::
 }
 
 void GameScene::DrawDebugAxes(const TriVector& position, float size) {
-    DrawDebugAxes(TranslationMotor(Euclidean(position)), size);
+    DrawDebugAxes(TranslationMotor(position), size);
 }
 
 void GameScene::DrawDebugAxes(const Motor& transform, float size) {

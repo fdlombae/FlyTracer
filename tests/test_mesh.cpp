@@ -44,6 +44,13 @@ TEST_F(MeshTest, AddVertex) {
     EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e021(), 3.0f);
 }
 
+TEST_F(MeshTest, AddVertexStoresWeightOne) {
+    mesh.AddVertex({.position = TriVector(2.0f, 4.0f, 6.0f, 2.0f)});
+    EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e032(), 1.0f);
+    EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e021(), 3.0f);
+    EXPECT_FLOAT_EQ(mesh.Vertices()[0].position.e123(), 1.0f);
+}
+
 TEST_F(MeshTest, AddTriangle) {
     for (int i = 0; i < 3; ++i) {
         mesh.AddVertex({.position = TriVector(static_cast<float>(i), 0.0f, 0.0f, 1.0f)});
@@ -286,6 +293,24 @@ TEST(MeshMeasuresTest, TetrahedronCenterOfMass) {
     EXPECT_NEAR(center.e032(), 0.25f, 1e-6f);
     EXPECT_NEAR(center.e013(), 0.25f, 1e-6f);
     EXPECT_NEAR(center.e021(), 0.25f, 1e-6f);
+}
+
+// The center does not depend on the size of the solid, however small its homogeneous weights get
+TEST(MeshMeasuresTest, TinyBoxCenterOfMass) {
+    const Mesh box = MakeBox(1e-5f, 1e-5f, 1e-5f, TranslationMotor(2e-5f, 3e-5f, 4e-5f));
+    const TriVector center = box.CenterOfMass();
+    EXPECT_FLOAT_EQ(center.e123(), 1.0f);
+    EXPECT_NEAR(center.e032(), 2e-5f, 1e-9f);
+    EXPECT_NEAR(center.e013(), 3e-5f, 1e-9f);
+    EXPECT_NEAR(center.e021(), 4e-5f, 1e-9f);
+}
+
+TEST(MeshMeasuresTest, FlatMeshCenterOfMassIsItsBoundsCenter) {
+    const Mesh triangle = MakeMesh({TriVector(0, 0, 0), TriVector(2, 0, 0), TriVector(0, 4, 0)}, {{0, 1, 2}});
+    const TriVector center = triangle.CenterOfMass();
+    EXPECT_FLOAT_EQ(center.e032(), 1.0f);
+    EXPECT_FLOAT_EQ(center.e013(), 2.0f);
+    EXPECT_FLOAT_EQ(center.e123(), 1.0f);
 }
 
 TEST(MeshMeasuresTest, ReversedWindingNegatesVolume) {

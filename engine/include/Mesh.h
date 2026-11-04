@@ -55,7 +55,8 @@ public:
     [[nodiscard]] bool HasMaterial(size_t index) const noexcept { return index < m_materials.size(); }
 
     void Clear();
-    void AddVertex(const Vertex& vertex) { m_vertices.push_back(vertex); }
+    // The position is stored with weight 1
+    void AddVertex(const Vertex& vertex);
     void AddTriangle(const Triangle& triangle) { m_triangles.push_back(triangle); }
 
     // Angle-weighted vertex normals, for triangles wound counter-clockwise seen from outside (as in OBJ)
@@ -70,6 +71,7 @@ public:
     // Measures of the solid the triangles enclose, after "Clean up your Mesh! Part 1" (De Keninck,
     // Roelfs, Dorst and Eelbode, 2025). They are only meaningful when IsClosed() holds.
     [[nodiscard]] float Volume() const;
+    // The bounds center for a solid without volume
     [[nodiscard]] TriVector CenterOfMass() const;
     [[nodiscard]] PrincipalInertia Inertia() const;
     // Every edge (with vertices welded by position) is run through as often in one direction as in

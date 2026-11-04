@@ -10,6 +10,7 @@ public:
     using GameScene::SetCamera;
     using GameScene::AddMesh;
     using GameScene::GetMesh;
+    using GameScene::GetMeshMaterial;
     using GameScene::AddMeshInstance;
     using GameScene::GetInstance;
     using GameScene::FindInstance;

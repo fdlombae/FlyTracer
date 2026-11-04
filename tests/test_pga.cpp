@@ -158,6 +158,14 @@ TEST(PGATest, RotationBetween) {
     ExpectNear(turned, 0.0f, std::sqrt(0.5f), std::sqrt(0.5f));
 
     ExpectNear(ApplyMotor(RotationBetween(x, x * -3.0f), x), -1.0f, 0.0f, 0.0f);
+    ExpectNear(ApplyMotor(RotationBetween(x, x * 0.0f), x), 1.0f, 0.0f, 0.0f);
+}
+
+// Every homogeneous multiple of a point is the same point, also with a negative weight
+TEST(PGATest, TranslationMotorToWeightedPoint) {
+    const TriVector origin(0.0f, 0.0f, 0.0f);
+    ExpectNear(ApplyMotor(TranslationMotor(TriVector(2.0f, 4.0f, 6.0f, 2.0f)), origin), 1.0f, 2.0f, 3.0f);
+    ExpectNear(ApplyMotor(TranslationMotor(TriVector(-1.0f, -2.0f, -3.0f, -1.0f)), origin), 1.0f, 2.0f, 3.0f);
 }
 
 TEST(PGATest, InstanceToWorld) {

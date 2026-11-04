@@ -69,6 +69,8 @@ struct Material {
     static Material Metal(const Color& col, float roughness = 0.3f) { return PBR(col, 1.0f, roughness); }
     static Material Matte(const Color& col) { return PBR(col, 0.0f, 1.0f); }
     static Material Glossy(const Color& col, float roughness = 0.2f) { return PBR(col, 0.0f, roughness); }
+    // For meshes without materials
+    static Material Default() { return PBR(Color(0.8f, 0.8f, 0.8f)); }
 };
 
 // ============================================================================

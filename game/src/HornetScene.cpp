@@ -28,7 +28,7 @@ void HornetScene::OnInit() {
     AddSphere(kLaser, 0.35f, Scene::Material::Metal(Scene::Color(0.25f, 0.25f, 0.28f), 0.3f));
 
     const uint32_t mirrorMeshId = LoadMesh("quad.obj");
-    GetMesh(mirrorMeshId)->GetMaterial(0) = Scene::Material::Phong(Scene::Color(0.9f, 0.92f, 0.95f), 128.0f, 0.85f);
+    GetMeshMaterial(mirrorMeshId, 0) = Scene::Material::Phong(Scene::Color(0.9f, 0.92f, 0.95f), 128.0f, 0.85f);
     for (size_t i = 0; i < kPivots.size(); ++i) {
         m_mirrorInstanceIds[i] = AddMeshInstance(mirrorMeshId, kPivots[i]);
         GetInstance(m_mirrorInstanceIds[i])->scale = kMirrorScale;
@@ -71,7 +71,7 @@ Motor HornetScene::PheasantTransform() const {
 
 // The middle of the model, where the laser aims
 TriVector HornetScene::PheasantCenter() const {
-    return ApplyMotor(GetMeshInstances()[m_pheasantInstanceId].transform, m_pheasantCenter);
+    return ApplyMotor(GetInstance(m_pheasantInstanceId)->transform, m_pheasantCenter);
 }
 
 void HornetScene::OnInput(const Input& input) {
