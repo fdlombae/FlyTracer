@@ -1,6 +1,7 @@
 #include "Swapchain.h"
 #include <algorithm>
 #include <iostream>
+#include <stdexcept>
 
 using VulkanHelpers::check;
 using VulkanHelpers::enumerate;
@@ -31,7 +32,8 @@ VkSurfaceFormatKHR chooseSurfaceFormat(VkPhysicalDevice physicalDevice, VkSurfac
             return *it;
         }
     }
-    return formats.at(0);
+    // The shader already encodes sRGB, an sRGB format would encode it twice
+    throw std::runtime_error("The surface has no 8-bit UNORM format with the sRGB color space");
 }
 
 } // anonymous namespace

@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -44,11 +45,13 @@ inline std::optional<RgbImage> ReadPpm(const std::string& path) {
     return image;
 }
 
-// A Vulkan context, or nothing when there is no usable GPU: the image tests skip themselves then
+// A Vulkan context, or nothing when there is no usable GPU: the image tests skip themselves then.
+// The reason is printed, so an engine error that makes the tests skip shows up.
 inline std::unique_ptr<VulkanContext> TryCreateContext() {
     try {
         return std::make_unique<VulkanContext>();
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        std::cerr << "No usable Vulkan device: " << e.what() << '\n';
         return nullptr;
     }
 }

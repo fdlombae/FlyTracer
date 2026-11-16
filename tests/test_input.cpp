@@ -17,6 +17,31 @@ TEST(InputTest, WasPressedOnlyInTheFirstFrame) {
     EXPECT_TRUE(input.WasPressed(Key::Space));
 }
 
+// A key that goes down and up again between two frames is still pressed once
+TEST(InputTest, TapBetweenFramesIsPressed) {
+    Input input;
+    input.SetKey(Key::Space, true);
+    input.SetKey(Key::Space, false);
+    EXPECT_TRUE(input.WasPressed(Key::Space));
+    EXPECT_FALSE(input.IsDown(Key::Space));
+    input.EndFrame();
+    EXPECT_FALSE(input.WasPressed(Key::Space));
+
+    input.SetMouseButton(MouseButton::Left, true);
+    input.SetMouseButton(MouseButton::Left, false);
+    EXPECT_TRUE(input.WasPressed(MouseButton::Left));
+}
+
+// Key repeats while the key is held do not press it again
+TEST(InputTest, RepeatIsNotAPress) {
+    Input input;
+    input.SetKey(Key::P, true);
+    input.EndFrame();
+    input.SetKey(Key::P, true);
+    EXPECT_FALSE(input.WasPressed(Key::P));
+    EXPECT_TRUE(input.IsDown(Key::P));
+}
+
 TEST(InputTest, MouseDeltasResetEveryFrame) {
     Input input;
     input.SetMousePosition(10.0f, 10.0f);

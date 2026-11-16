@@ -29,10 +29,15 @@ AABB worldBounds(const MeshInstance& instance, const AABB& meshBounds) {
     return bounds;
 }
 
+// A finite motor with a nonzero rotor part, which normalizing makes a rigid motion
+bool isRigidMotion(const Motor& motor) {
+    return std::ranges::all_of(motor, [](float c) { return std::isfinite(c); }) && motor.Norm() > 0.0f;
+}
+
 bool isDrawn(const MeshInstance& instance, const MeshTable& table) {
     return instance.visible && instance.meshId < table.layouts.size() &&
            table.layouts[instance.meshId].triangleCount > 0 &&
-           std::isfinite(instance.scale) && instance.scale != 0.0f;
+           std::isfinite(instance.scale) && instance.scale != 0.0f && isRigidMotion(instance.transform);
 }
 
 } // anonymous namespace
