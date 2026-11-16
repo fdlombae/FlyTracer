@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <string>
 
 #include "Config.h"
 #include "GameScene.h"
@@ -29,7 +30,9 @@ public:
 private:
     void handleEvents();
     void render(float deltaTime);
-    void drawRendererStats(float deltaTime);
+    void drawRendererWindow(float deltaTime);
+    // Compiles engine/shaders/raytracer.comp again and loads it; the current shader stays on errors
+    void reloadShader();
 
     SDL_Window* m_window{nullptr};
     std::unique_ptr<VulkanRenderer> m_renderer;
@@ -37,9 +40,16 @@ private:
     Input m_input;
     bool m_running{false};
 
-    // GPU raytracing time, averaged over half a second like the scenes' FPS
+    std::string m_shaderDirectory;
+    std::string m_shaderStatus;
+    bool m_reloadShaderRequested{false};
+    float m_renderScale;  // The slider's value, applied when it is released
+
+    // Frame time and GPU raytracing time, averaged over half a second like the scenes' FPS
+    double m_frameMilliseconds{0.0};
+    uint32_t m_frameCount{0};
     std::optional<double> m_gpuMilliseconds;
     double m_gpuMillisecondsSum{0.0};
     uint32_t m_gpuSampleCount{0};
-    float m_gpuSampleTime{0.0f};
+    float m_sampleTime{0.0f};
 };

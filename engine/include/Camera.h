@@ -1,15 +1,14 @@
 #pragma once
 
-#include "FlyFish.h"
 #include "PGA.h"
 #include <cmath>
 #include <optional>
 
 // Pinhole camera looking from eye towards target; up is a direction (e123 = 0)
 struct Camera {
-    TriVector eye{0.0f, 3.5f, 8.0f};
-    TriVector target{0.0f, 1.5f, 0.0f};
-    TriVector up{0.0f, 1.0f, 0.0f, 0.0f};
+    TriVector eye{TriVector::Point(0.0f, 3.5f, 8.0f)};
+    TriVector target{TriVector::Point(0.0f, 1.5f, 0.0f)};
+    TriVector up{TriVector::Direction(0.0f, 1.0f, 0.0f)};
     float fov{45.0f};       // Vertical field of view in degrees
     float exposure{1.0f};   // Scales the radiance before tone mapping
 };
@@ -32,13 +31,13 @@ struct Camera {
     const Vector top = view & right;
     const TriVector up = PlaneNormal(top);
 
-    const Motor turn = RotationBetween(TriVector(0.0f, 0.0f, -1.0f, 0.0f), forward);
-    const TriVector turnedUp = ApplyMotor(turn, TriVector(0.0f, 1.0f, 0.0f, 0.0f));
+    const Motor turn = RotationBetween(TriVector::Direction(0.0f, 0.0f, -1.0f), forward);
+    const TriVector turnedUp = ApplyMotor(turn, TriVector::Direction(0.0f, 1.0f, 0.0f));
     // The inner product of two lines through the origin is minus the product of their directions'
     // lengths and the cosine of their angle; turnedUp has length 1
-    const TriVector origin(0.0f, 0.0f, 0.0f);
+    const TriVector origin = TriVector::Point(0.0f, 0.0f, 0.0f);
     const bool upsideDown = -((origin & turnedUp) | (origin & up)) < -0.9999f * up.VNorm();
-    const Motor roll = upsideDown ? Motor::Rotation(180.0f, origin & forward) : RotationBetween(turnedUp, up);
+    const Motor roll = upsideDown ? Motor::Rotation(Angle::FromDegrees(180.0f), origin & forward) : RotationBetween(turnedUp, up);
     return TranslationMotor(Euclidean(camera.eye)) * roll * turn;
 }
 
@@ -52,6 +51,6 @@ struct Camera {
     const float tanHalfFov = std::tan(0.5f * camera.fov * DEG_TO_RAD);
     const float right = (2.0f * x / width - 1.0f) * (width / height) * tanHalfFov;
     const float up = (1.0f - 2.0f * y / height) * tanHalfFov;
-    const TriVector direction = ApplyMotor(*motor, TriVector(right, up, -1.0f, 0.0f));
+    const TriVector direction = ApplyMotor(*motor, TriVector::Direction(right, up, -1.0f));
     return Euclidean(camera.eye) & direction;
 }

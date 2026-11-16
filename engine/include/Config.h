@@ -41,6 +41,7 @@ struct AppConfig {
 
     // Raytracing settings
     int maxRayBounces{3};
+    float renderScale{1.0f};  // Raytraced pixels per window pixel along each side, 0.25 to 1
 
     // Resource paths
     std::string resourceDirectory{"resources"};
@@ -84,7 +85,8 @@ struct AppConfig {
              << "fullscreen=" << (fullscreen ? "true" : "false") << "\n"
              << "vsync=" << (vsync ? "true" : "false") << "\n\n"
              << "# Raytracing Settings\n"
-             << "max_ray_bounces=" << maxRayBounces << "\n\n"
+             << "max_ray_bounces=" << maxRayBounces << "\n"
+             << "render_scale=" << renderScale << "\n\n"
              << "# Resource Paths\n"
              << "resource_directory=" << resourceDirectory << "\n"
              << "shader_directory=" << shaderDirectory << "\n";
@@ -102,6 +104,7 @@ private:
         else if (key == "fullscreen") fullscreen = flag;
         else if (key == "vsync") vsync = flag;
         else if (key == "max_ray_bounces") parseNumber(value, maxRayBounces);
+        else if (key == "render_scale") parseNumber(value, renderScale);
         else if (key == "resource_directory") resourceDirectory = value;
         else if (key == "shader_directory") shaderDirectory = value;
     }

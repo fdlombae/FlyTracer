@@ -1,30 +1,33 @@
 #include "SceneRegistry.h"
-#include "BiReflectionScene.h"
 #include "DebugDemoScene.h"
-#include "HornetScene.h"
-#include "PluckerScene.h"
-#include "QuaternionScene.h"
 #include "TestBoxScene.h"
+#include <algorithm>
 #include <iostream>
 
+namespace {
+
+template<typename SceneType>
+std::unique_ptr<GameScene> create(const std::string& resourceDir) {
+    return std::make_unique<SceneType>(resourceDir);
+}
+
+// A new scene only needs a line here (and its .cpp in CMakeLists.txt)
+constexpr SceneEntry kScenes[]{
+    {"testbox", create<TestBoxScene>},
+    {"debug", create<DebugDemoScene>},
+};
+
+} // anonymous namespace
+
+std::span<const SceneEntry> Scenes() {
+    return kScenes;
+}
+
 std::unique_ptr<GameScene> CreateScene(std::string_view name, const std::string& resourceDir) {
-    if (name == "testbox") {
-        return std::make_unique<TestBoxScene>(resourceDir);
-    } else if (name == "debug") {
-        return std::make_unique<DebugDemoScene>(resourceDir);
-    } else if (name == "bireflection") {
-        return std::make_unique<BiReflectionScene>(resourceDir);
-    } else if (name == "birot") {
-        return std::make_unique<BiReflectionScene>(resourceDir, BiReflectionScene::DemoMode::Rotation);
-    } else if (name == "bitrans") {
-        return std::make_unique<BiReflectionScene>(resourceDir, BiReflectionScene::DemoMode::Translation);
-    } else if (name == "quaternion") {
-        return std::make_unique<QuaternionScene>(resourceDir);
-    } else if (name == "plucker") {
-        return std::make_unique<PluckerScene>(resourceDir);
-    } else if (name == "hornet") {
-        return std::make_unique<HornetScene>(resourceDir);
+    const auto it = std::ranges::find(kScenes, name, &SceneEntry::name);
+    if (it != std::end(kScenes)) {
+        return it->create(resourceDir);
     }
-    std::cerr << "Unknown scene '" << name << "', using debug scene\n";
-    return std::make_unique<DebugDemoScene>(resourceDir);
+    std::cerr << "Unknown scene '" << name << "', using " << kScenes[0].name << "\n";
+    return kScenes[0].create(resourceDir);
 }

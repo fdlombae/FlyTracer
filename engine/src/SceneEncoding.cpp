@@ -21,7 +21,7 @@ MeshLayout layoutOf(const Mesh& mesh) {
 AABB worldBounds(const MeshInstance& instance, const AABB& meshBounds) {
     AABB bounds;
     for (int corner = 0; corner < 8; ++corner) {
-        const TriVector local((corner & 1) ? meshBounds.max[0] : meshBounds.min[0],
+        const TriVector local = TriVector::Point((corner & 1) ? meshBounds.max[0] : meshBounds.min[0],
                               (corner & 2) ? meshBounds.max[1] : meshBounds.min[1],
                               (corner & 4) ? meshBounds.max[2] : meshBounds.min[2]);
         bounds.Grow(instance.ToWorld(local));

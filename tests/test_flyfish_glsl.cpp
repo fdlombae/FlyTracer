@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include "FlyFish.h"
 #include "PGA.h"
 #include "render_helpers.h"
 #include <algorithm>
@@ -63,17 +62,23 @@ Cases MakeCases() {
 
     Cases cases;
     for (uint32_t i = 0; i < kCases; ++i) {
-        const TriVector p(random(), random(), random());
-        const TriVector q(random(), random(), random());
-        const TriVector d(random(), random(), random(), 0.0f);
-        const BiVector lineA(random(), random(), random(), random(), random(), random());
-        const BiVector lineB(random(), random(), random(), random(), random(), random());
-        const Vector planeA(random(), random(), random(), random());
-        const Vector planeB(random(), random(), random(), random());
-        const Vector unitPlane = Vector(random(), random(), random(), random()).Normalized();
+        const TriVector p = TriVector::Point(random(), random(), random());
+        const TriVector q = TriVector::Point(random(), random(), random());
+        const TriVector d = TriVector::Direction(random(), random(), random());
+        // Any bivector: a line through two points plus a line at infinity, the join of two directions
+        const auto randomPoint = [&] { return TriVector::Point(random(), random(), random()); };
+        const auto randomDirection = [&] { return TriVector::Direction(random(), random(), random()); };
+        const auto randomBiVector = [&] {
+            return (randomPoint() & randomPoint()) + (randomDirection() & randomDirection());
+        };
+        const BiVector lineA = randomBiVector();
+        const BiVector lineB = randomBiVector();
+        const Vector planeA = Vector::Plane(random(), random(), random(), random());
+        const Vector planeB = Vector::Plane(random(), random(), random(), random());
+        const Vector unitPlane = Vector::Plane(random(), random(), random(), random()).Normalized();
         // A screw motion: a rotation around a line off the origin, then a translation in any direction
-        const BiVector axis = TriVector(random(), random(), random()) & TriVector(random(), random(), random());
-        const Motor motor = TranslationMotor(random(), random(), random()) * Motor::Rotation(90.0f * random(), axis);
+        const BiVector axis = TriVector::Point(random(), random(), random()) & TriVector::Point(random(), random(), random());
+        const Motor motor = Motor::Translation(random(), random(), random()) * Motor::Rotation(Angle::FromDegrees(90.0f * random()), axis);
 
         append(cases.inputs, p);
         append(cases.inputs, q);

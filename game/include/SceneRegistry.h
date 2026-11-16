@@ -1,14 +1,18 @@
 #pragma once
 
 #include "GameScene.h"
-#include <array>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 
-// The scenes the --scene argument can choose
-inline constexpr auto kSceneNames = std::to_array<std::string_view>(
-    {"bireflection", "birot", "bitrans", "quaternion", "plucker", "hornet", "testbox", "debug"});
+struct SceneEntry {
+    std::string_view name;
+    std::unique_ptr<GameScene> (*create)(const std::string& resourceDir);
+};
 
-// The debug scene for an unknown name
+// The scenes the --scene argument can choose, listed in SceneRegistry.cpp. The first one is the default.
+[[nodiscard]] std::span<const SceneEntry> Scenes();
+
+// The default scene for an unknown name
 [[nodiscard]] std::unique_ptr<GameScene> CreateScene(std::string_view name, const std::string& resourceDir);

@@ -3,8 +3,12 @@
 #include <imgui_impl_sdl3.h>
 #include <algorithm>
 #include <array>
+#include <cstdlib>
+#include <exception>
+#include <iostream>
 #include <optional>
 #include <stdexcept>
+#include <utility>
 
 namespace {
 
@@ -70,6 +74,21 @@ std::optional<MouseButton> toMouseButton(Uint8 sdlButton) {
 // A long stall (breakpoint, window drag) would otherwise make animations jump
 constexpr double kMaxDeltaTime = 0.1;
 
+// Runs glslc on the raytracing shader in the source tree, as the build does (the paths come from
+// CMakeLists.txt). glslc prints its errors to the console.
+bool compileRaytracingShader(const std::string& shaderDirectory) {
+    const auto quoted = [](const std::string& text) { return '"' + text + '"'; };
+    const std::string sourceDirectory = FLYTRACER_SHADER_SOURCE_DIR;
+    std::string command = quoted(FLYTRACER_GLSLC) + " --target-env=vulkan1.3 -I" + quoted(sourceDirectory) +
+                          " -I" + quoted(FLYTRACER_ENGINE_INCLUDE_DIR) + " " +
+                          quoted(sourceDirectory + "/raytracer.comp") + " -o " +
+                          quoted(shaderDirectory + "/raytracer.comp.spv");
+#ifdef _WIN32
+    command = quoted(command);  // cmd.exe strips the outer quotes of a command that starts with one
+#endif
+    return std::system(command.c_str()) == 0;
+}
+
 } // anonymous namespace
 
 std::filesystem::path ExecutableRelativePath(const std::filesystem::path& path) {
@@ -80,6 +99,8 @@ std::filesystem::path ExecutableRelativePath(const std::filesystem::path& path) 
 
 Application::Application(const FlyTracer::AppConfig& config, std::unique_ptr<GameScene> scene)
     : m_gameScene(std::move(scene))
+    , m_shaderDirectory(ExecutableRelativePath(config.shaderDirectory).string())
+    , m_renderScale(config.renderScale)
 {
     if (!m_gameScene) {
         throw std::invalid_argument("Application requires a scene");
@@ -104,7 +125,8 @@ Application::Application(const FlyTracer::AppConfig& config, std::unique_ptr<Gam
         m_renderer = std::make_unique<VulkanRenderer>(m_window, VulkanRenderer::Config{
             .vsync = config.vsync,
             .maxBounces = static_cast<uint32_t>(std::max(config.maxRayBounces, 1)),
-            .shaderDir = ExecutableRelativePath(config.shaderDirectory).string(),
+            .renderScale = config.renderScale,
+            .shaderDir = m_shaderDirectory,
         });
 
         m_gameScene->Init();
@@ -167,6 +189,9 @@ void Application::handleEvents() {
                 if (event.key.key == SDLK_ESCAPE) {
                     m_running = false;
                 }
+                if (event.key.key == SDLK_F5 && !event.key.repeat) {
+                    m_reloadShaderRequested = true;
+                }
                 if (const KeyBinding* binding = findKeyBinding(event.key.key);
                     binding && (binding->alwaysForGame || !imguiWantsKeyboard)) {
                     m_input.SetKey(binding->key, true);
@@ -216,21 +241,42 @@ void Application::render(float deltaTime) {
         return;
     }
     m_gameScene->DrawGui();
-    drawRendererStats(deltaTime);
+    drawRendererWindow(deltaTime);
+    if (std::exchange(m_reloadShaderRequested, false)) {
+        reloadShader();
+    }
     m_renderer->EndFrame(*m_gameScene);
 }
 
-void Application::drawRendererStats(float deltaTime) {
+void Application::reloadShader() {
+    try {
+        if (!compileRaytracingShader(m_shaderDirectory)) {
+            throw std::runtime_error("it does not compile, see the console");
+        }
+        m_renderer->ReloadShader();
+        m_shaderStatus = "Shader reloaded";
+    } catch (const std::exception& e) {
+        m_shaderStatus = std::string("Shader not reloaded: ") + e.what();
+    }
+    std::cout << m_shaderStatus << "\n";
+}
+
+void Application::drawRendererWindow(float deltaTime) {
     if (const auto milliseconds = m_renderer->RaytracingMilliseconds()) {
         m_gpuMillisecondsSum += *milliseconds;
         ++m_gpuSampleCount;
     }
-    m_gpuSampleTime += deltaTime;
-    if (m_gpuSampleTime >= 0.5f && m_gpuSampleCount > 0) {
-        m_gpuMilliseconds = m_gpuMillisecondsSum / m_gpuSampleCount;
+    ++m_frameCount;
+    m_sampleTime += deltaTime;
+    if (m_sampleTime >= 0.5f) {
+        m_frameMilliseconds = 1000.0 * m_sampleTime / m_frameCount;
+        if (m_gpuSampleCount > 0) {
+            m_gpuMilliseconds = m_gpuMillisecondsSum / m_gpuSampleCount;
+        }
         m_gpuMillisecondsSum = 0.0;
         m_gpuSampleCount = 0;
-        m_gpuSampleTime = 0.0f;
+        m_frameCount = 0;
+        m_sampleTime = 0.0f;
     }
 
     // Kept in the bottom left corner, out of the way of the scenes' windows
@@ -238,10 +284,33 @@ void Application::drawRendererStats(float deltaTime) {
     ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + 10.0f, viewport->WorkPos.y + viewport->WorkSize.y - 10.0f),
                             ImGuiCond_Always, ImVec2(0.0f, 1.0f));
     ImGui::Begin("Renderer", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNavInputs);
+    const VkExtent2D extent = m_renderer->RenderExtent();
+    ImGui::Text("Frame: %.2f ms at %u x %u", m_frameMilliseconds, extent.width, extent.height);
     if (m_gpuMilliseconds) {
         ImGui::Text("Raytracing (GPU): %.2f ms", *m_gpuMilliseconds);
-    } else {
-        ImGui::TextDisabled("Raytracing (GPU): not measurable with this driver");
+    }
+
+    if (ImGui::CollapsingHeader("Settings")) {
+        int bounces = static_cast<int>(m_renderer->MaxBounces());
+        if (ImGui::SliderInt("Bounces", &bounces, 1, 8, "%d", ImGuiSliderFlags_AlwaysClamp)) {
+            m_renderer->SetMaxBounces(static_cast<uint32_t>(bounces));
+        }
+        float exposure = m_renderer->Exposure();
+        if (ImGui::SliderFloat("Exposure", &exposure, 0.25f, 4.0f, "%.2f", ImGuiSliderFlags_Logarithmic)) {
+            m_renderer->SetExposure(exposure);
+        }
+        // Applied when the slider is released: every change recreates the raytracer's images
+        ImGui::SliderFloat("Render scale", &m_renderScale, VulkanRenderer::kMinRenderScale, 1.0f, "%.2f",
+                           ImGuiSliderFlags_AlwaysClamp);
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            m_renderer->SetRenderScale(m_renderScale);
+        }
+        if (ImGui::Button("Reload shader (F5)")) {
+            m_reloadShaderRequested = true;
+        }
+        if (!m_shaderStatus.empty()) {
+            ImGui::TextUnformatted(m_shaderStatus.c_str());
+        }
     }
     ImGui::End();
 }

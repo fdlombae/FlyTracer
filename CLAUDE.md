@@ -35,8 +35,10 @@ cmake --build build
 ./build/bin/FlyTracer
 ./build/bin/FlyTracer --scene debug
 ./build/bin/FlyTracer --scene testbox
-./build/bin/FlyTracer --scene bireflection   # also birot, bitrans, quaternion, plucker, hornet
 ./build/bin/FlyTracer --no-vsync --fullscreen
+./build/bin/FlyTracer --render-scale 0.5     # raytrace at half the window's resolution
+# While it runs: F5 compiles engine/shaders/raytracer.comp again and reloads it; the Renderer window
+# has the frame time and settings (bounces, exposure, render scale)
 
 # Benchmark: every scene headless, fixed time step, default 200 frames at 1920 x 1080 pixels
 # (compare at 1080p or more; smaller sizes are dominated by fixed overhead)
@@ -60,7 +62,7 @@ FLYTRACER_GPU_VALIDATION=1 ./build-debug/bin/FlyTracer
 cmake -B build -G "Visual Studio 17 2022"
 ```
 
-Requires: CMake 3.20+, C++23 compiler, Vulkan SDK 1.4 with `glslc` shader compiler. On macOS the KosmicKrisp driver (SDK 1.4.363+, Apple Silicon, macOS 26+) is required; MoltenVK is not supported. Dependencies (SDL3, tinyobjloader, Dear ImGui, Google Test, FlyFish) are fetched automatically via CMake FetchContent. Only `FlyFish.h` is downloaded, pinned to a commit in `CMakeLists.txt`; use `-DFETCHCONTENT_SOURCE_DIR_FLYFISH=<FlyFish>/src` to build against a local FlyFish checkout.
+Requires: CMake 3.20+, C++23 compiler, Vulkan SDK 1.4 with `glslc` shader compiler. On macOS the KosmicKrisp driver (SDK 1.4.363+, Apple Silicon, macOS 26+) is required; MoltenVK is not supported. Dependencies (SDL3, tinyobjloader, Dear ImGui, Google Test, FlyFish) are fetched automatically via CMake FetchContent. Only `FlyFish.h` is downloaded, pinned to the commit of v2.0.0 in `CMakeLists.txt`; use `-DFETCHCONTENT_SOURCE_DIR_FLYFISH=<FlyFish>/include/flyfish` to build against a local FlyFish checkout.
 
 ## Architecture
 
@@ -72,21 +74,21 @@ Requires: CMake 3.20+, C++23 compiler, Vulkan SDK 1.4 with `glslc` shader compil
 
 ### Core Classes
 
-- **`Application`** — Owns the SDL3 window (resizable, high pixel density), main loop and input mapping. Creates the `VulkanRenderer` and drives the `GameScene` each frame: `HandleInput`, `Update`, `DrawGui`, render.
+- **`Application`** — Owns the SDL3 window (resizable, high pixel density), main loop and input mapping, the Renderer window (frame time, settings) and the F5 shader reload (runs glslc with the paths CMake compiled in). Creates the `VulkanRenderer` and drives the `GameScene` each frame: `HandleInput`, `Update`, `DrawGui`, render.
 - **`GameScene`** (abstract base) — Non-virtual engine interface (`Init`, `HandleInput`, `Update`, `DrawGui`, `Shutdown`) wrapping protected virtual hooks (`OnInit`, `OnInput`, `OnUpdate`, `OnGui`, `OnShutdown`). Scene data is private; derived scenes use the protected API: `SetCamera`, `LoadMesh`/`AddMesh`, `AddMeshInstance`, `AddSphere`, `AddPlane`, lights, debug drawing.
-- **`Scene` types** (`Scene.h`) — `Material`, `Sphere`, `Plane`, `Light` in PGA types; colors are sRGB. `MeshInstance` (in `GameScene.h`) is a motor, uniform scale and optional mirror plane.
+- **`Scene` types** (`Scene.h`) — `Material`, `Sphere`, `Plane`, `Light` in PGA types; colors are sRGB. `MeshInstance` (in `GameScene.h`) is a motor, uniform scale and optional mirror plane; `AddMeshInstance` also takes a whole one (e.g. `Reflected(plane)`).
 - **`Input`** — Key and mouse state with `IsDown` / `WasPressed` edge detection. `OrbitCamera` implements the usual right-drag orbit and scroll zoom with motors.
 - **`Mesh`** — OBJ loading via tinyobjloader, normals, UVs, and its bottom-level `BVH` (`BuildBVH` in `BVH.h`, binned SAH, depth limited to the shader's stack). Measures after "Clean up your Mesh!" (De Keninck et al. 2025): `Volume`, `CenterOfMass`, `Inertia` (principal moments and a rotor, Jacobi with rotors) and `IsClosed` (welded edges run through equally often both ways).
 - **`BVH.h`** — besides the SAH builder: `PairChildren`, which turns a BVH into node pairs holding both children's boxes, the GPU's node layout.
 - **`MeshLines`** — `BuildEdges` welds vertices by position and stores every edge once as an anchored line (anchor point + direction), so the Plücker edge test is watertight and stays precise far from the origin.
 - **`Camera.h`** — Eye-target-up camera; `CameraMotor` is the motor from the camera's own frame (looking down -z, +y up) to the world, built from joins, which the shader gets; `ViewRay` uses it for picking.
 - **`SceneEncoding`** — The scene encoded for the GPU on the CPU, unit-testable: `EncodeMeshes` (all meshes concatenated, plus a `MeshTable`), `MeshesChanged` (meshes added or changed in counts or textures: `RaytracingPass::Record` uploads them again) and `EncodeFrame` (materials, primitives, lights, the drawn instances and the top-level BVH, debug lines; mesh materials are read every frame).
-- **`ShaderInterface.h`** — `#define`s that C++ and GLSL both include: binding numbers, texture limit, BVH stack size, workgroup size, the reversed-edge bit. `FlyTracer_ShaderTest` checks the GLSL structs against `GpuScene.h`.
-- **Vulkan side** — `VulkanContext` (instance, device, single queue; requires scalar block layout), `Swapchain` (recreated on resize), `ImGuiLayer`, `RaytracingPass` (compute pipeline, images, buffers and textures, uploads of the encoded scene, accumulation, `GpuTimer` timestamps around the dispatch) and `VulkanRenderer` (frames in flight, blit, submit, present). `VulkanHelpers` holds the small Vulkan building blocks (owning handles, buffers, images, descriptor and pipeline helpers, `enumerate` for the count-then-fill queries); its `CommandSubmitter` records, submits and waits for one-time command buffers (uploads, benchmark, tests). `Benchmark` renders scenes headless and reports GPU timestamp times (n/a on KosmicKrisp, which gives all timestamps in a command buffer the same value) and submit-to-completion times. `GpuScene` encodes scene types into the GPU structs (sRGB to linear, normalized motors and planes; mesh records and node pairs tightly packed).
+- **`ShaderInterface.h`** — `#define`s that C++ and GLSL both include: descriptor sets and binding numbers, texture limit, BVH stack size, workgroup size, the reversed-edge bit. `FlyTracer_ShaderTest` checks the GLSL structs against `GpuScene.h`.
+- **Vulkan side** — `VulkanContext` (instance, device, single queue; requires Vulkan 1.4 and checks the features it enables, naming the missing ones; `SetName`, `BeginLabel`/`EndLabel` for debug utils names and labels), `Swapchain` (recreated on resize), `ImGuiLayer`, `RaytracingPass` (compute pipeline, images, buffers and textures, uploads of the encoded scene, accumulation, `GpuTimer` timestamps around the dispatch; the scene's images and buffers are pushed descriptors (set `SET_SCENE`), the texture array is an ordinary set (`SET_TEXTURES`); `ReloadShader`, `SetMaxBounces`, `SetExposure`) and `VulkanRenderer` (frames in flight, render scale, blit, submit, present). `VulkanHelpers` holds the small Vulkan building blocks (owning handles, buffers, images, descriptor and pipeline helpers, `enumerate` for the count-then-fill queries); its `CommandSubmitter` records, submits and waits for one-time command buffers (uploads, benchmark, tests). `Benchmark` renders scenes headless and reports GPU timestamp times (n/a on KosmicKrisp, which gives all timestamps in a command buffer the same value) and submit-to-completion times. `GpuScene` encodes scene types into the GPU structs (sRGB to linear, normalized motors and planes; mesh records and node pairs tightly packed).
 
 ### Rendering Pipeline
 
-The raytracer runs as one Vulkan compute shader (`engine/shaders/raytracer.comp`), written in PGA with `flyfish.glsl` (see `docs/pga-tracer.md`). Whitted-style: direct light with shadow rays at every hit, then mirror or glossy reflections. The camera is a motor, rays are points with directions, instances move them into object space with sandwiches, triangles are tested with the Plücker products of their anchored edges (watertight), mirror bounces reflect in the tangent plane, the GGX tangent frame is a rotor. Each frame adds one jittered sample to a running average in an `rgba32f` accumulation image (reset when the camera or scene data changes), tone maps it (ACES) and writes sRGB to an `rgba8` output image, which is blitted to the (UNORM) swapchain before ImGui draws on top (dynamic rendering). Supporting GLSL files:
+The raytracer runs as one Vulkan compute shader (`engine/shaders/raytracer.comp`), written in PGA with `flyfish.glsl`. Whitted-style: direct light with shadow rays at every hit, then mirror or glossy reflections. The camera is a motor, rays are points with directions, instances move them into object space with sandwiches, triangles are tested with the Plücker products of their anchored edges (watertight), mirror bounces reflect in the tangent plane, the GGX tangent frame is a rotor. Each frame adds one jittered sample to a running average in an `rgba32f` accumulation image (reset when the camera or scene data changes), tone maps it (ACES) and writes sRGB to an `rgba8` output image, which is blitted (stretched when the render scale is below 1) to the (UNORM) swapchain before ImGui draws on top (dynamic rendering). Supporting GLSL files:
 - `flyfish.glsl` — FlyFish's `Vector`, `BiVector`, `TriVector`, `Motor` with `join` (&), `meet` (^), `inner` (|), `geometricProduct`, `sandwich`, `reverse`, `reflectInPlane`, same coefficients and signs as FlyFish.h
 - `common.glsl` — Constants and GPU structs (includes `engine/include/ShaderInterface.h`)
 - `ray.glsl` — The ray, `relativeTo` (origin split) and `rayParameter` (where a ray meets a plane)
@@ -102,9 +104,10 @@ The raytracer runs as one Vulkan compute shader (`engine/shaders/raytracer.comp`
 
 Transforms use PGA Motors (dual quaternions encoding rotation + translation), always applied as sandwich products `M X ~M`, also on the GPU (no matrices):
 - **TriVector** — 3D point (`e032`=x, `e013`=y, `e021`=z, `e123`=w; w = 0 for directions)
-- **Vector** — Plane `e1*x + e2*y + e3*z + e0 = 0`
-- **BiVector** — Line in Plucker coordinates, e.g. the join `p & q` of two points
-- **Motor** — Rotation + translation; `T * R` applies `R` first. Helpers in `PGA.h`: `TranslationMotor`, `ApplyMotor` (points and planes), `ReflectInPlane`, `ReflectionMotor`, `MotorPower`, `NormalizedMotor`.
+- **Vector** — Plane `e1*x + e2*y + e3*z + e0 = 0`, made with `Vector::Plane(a, b, c, d)` for `a*x + b*y + c*z + d = 0`
+- **BiVector** — Line in Plucker coordinates, e.g. the join `p & q` of two points or `BiVector::LineFromPoints`
+- The types are made with FlyFish's factories (`TriVector::Point`, `TriVector::Direction`, `Vector::Plane`, `BiVector::LineFromPoints`, `Motor::Rotation`, `Motor::Translation`), not their coefficient constructors; only `Motor`'s is still used (identity and `PGA.h`)
+- **Motor** — Rotation + translation; `T * R` applies `R` first. Translations are FlyFish's `Motor::Translation(x, y, z)`. Helpers in `PGA.h`: `TranslationMotor` (to a point), `ApplyMotor` (points and planes), `ReflectInPlane`, `ReflectionMotor`, `MotorPower`, `NormalizedMotor`.
 - Two reflections compose with FlyFish's geometric product: reflecting in `a` and then `b` is `b * a` (`ReflectionMotor(a, b)`).
 
 ### GPU Buffer Strategy
@@ -117,4 +120,4 @@ Transforms use PGA Motors (dual quaternions encoding rotation + translation), al
 
 1. Create header in `game/include/` and source in `game/src/` inheriting from `GameScene`, overriding the protected hooks (`OnInit()`, `OnInput(const Input&)`, `OnUpdate(float)`, `OnGui()`)
 2. Add the `.cpp` to the executable sources in `CMakeLists.txt`
-3. Register the scene name in `game/src/SceneRegistry.cpp` (`kSceneNames` and `CreateScene`), which `--scene`, the benchmark and `FlyTracer_SceneTest` use (record its reference image by running the test once)
+3. Add a line to the `kScenes` table in `game/src/SceneRegistry.cpp`, which `--scene`, the benchmark and `FlyTracer_SceneTest` use (record its reference image by running the test once). The first entry is the default scene.

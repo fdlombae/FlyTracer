@@ -74,8 +74,8 @@ TEST(SceneEncodingTest, ChangedMeshesAreNoticed) {
 TEST(SceneEncodingTest, MaterialsAreReadEveryFrame) {
     OpenScene scene;
     const uint32_t meshId = scene.AddMesh(makeBox(Scene::Color::White()));
-    scene.AddSphere(TriVector(0.0f, 0.0f, 0.0f), 1.0f, Scene::Material::Lambert(Scene::Color::White()));
-    scene.AddPlane(Vector(0.0f, 0.0f, 1.0f, 0.0f), Scene::Material::Lambert(Scene::Color::White()));
+    scene.AddSphere(TriVector::Point(0.0f, 0.0f, 0.0f), 1.0f, Scene::Material::Lambert(Scene::Color::White()));
+    scene.AddPlane(Vector::Plane(0.0f, 1.0f, 0.0f, 0.0f), Scene::Material::Lambert(Scene::Color::White()));
     const MeshTable table = EncodeMeshes(scene.GetMeshes(), 64).table;
 
     scene.GetMesh(meshId)->GetMaterial(0).color = Scene::Color(0.0f, 0.0f, 1.0f);
@@ -90,14 +90,14 @@ TEST(SceneEncodingTest, MaterialsAreReadEveryFrame) {
 TEST(SceneEncodingTest, OnlyDrawableInstancesAreEncoded) {
     OpenScene scene;
     const uint32_t meshId = scene.AddMesh(makeBox(Scene::Color::White()));
-    scene.AddMeshInstance(meshId, TriVector(0.0f, 0.0f, 0.0f));
-    scene.GetInstance(scene.AddMeshInstance(meshId, TriVector(5.0f, 0.0f, 0.0f)))->scale = 0.0f;
-    scene.GetInstance(scene.AddMeshInstance(meshId, TriVector(9.0f, 0.0f, 0.0f)))->scale =
+    scene.AddMeshInstance(meshId, TriVector::Point(0.0f, 0.0f, 0.0f));
+    scene.GetInstance(scene.AddMeshInstance(meshId, TriVector::Point(5.0f, 0.0f, 0.0f)))->scale = 0.0f;
+    scene.GetInstance(scene.AddMeshInstance(meshId, TriVector::Point(9.0f, 0.0f, 0.0f)))->scale =
         std::numeric_limits<float>::quiet_NaN();
-    scene.GetInstance(scene.AddMeshInstance(meshId, TriVector(7.0f, 0.0f, 0.0f)))->visible = false;
+    scene.GetInstance(scene.AddMeshInstance(meshId, TriVector::Point(7.0f, 0.0f, 0.0f)))->visible = false;
     const MeshTable table = EncodeMeshes(scene.GetMeshes(), 64).table;
     // A mesh added after the meshes were encoded has no buffers yet
-    scene.AddMeshInstance(scene.AddMesh(makeBox(Scene::Color::White())), TriVector(3.0f, 0.0f, 0.0f));
+    scene.AddMeshInstance(scene.AddMesh(makeBox(Scene::Color::White())), TriVector::Point(3.0f, 0.0f, 0.0f));
 
     EXPECT_EQ(EncodeFrame(scene, table).instances.size(), 1u);
 }
@@ -107,7 +107,7 @@ TEST(SceneEncodingTest, TopLevelLeavesCoverEveryInstanceOnce) {
     OpenScene scene;
     const uint32_t meshId = scene.AddMesh(makeBox(Scene::Color::White()));
     for (const float x : {0.0f, 0.0f, 0.0f, 4.0f, 8.0f}) {
-        scene.AddMeshInstance(meshId, TriVector(x, 0.0f, 0.0f));
+        scene.AddMeshInstance(meshId, TriVector::Point(x, 0.0f, 0.0f));
     }
     const FrameData frame = EncodeFrame(scene, EncodeMeshes(scene.GetMeshes(), 64).table);
 

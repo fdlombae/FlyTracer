@@ -1,13 +1,12 @@
 #pragma once
 
-#include "FlyFish.h"
 #include "Input.h"
 #include "PGA.h"
 #include <algorithm>
 
 // Camera circling a target: dragging with the right mouse button orbits, scrolling zooms
 struct OrbitCamera {
-    TriVector target{0.0f, 0.0f, 0.0f};
+    TriVector target{TriVector::Point(0.0f, 0.0f, 0.0f)};
     float yaw{0.0f};    // Radians around the vertical axis, 0 looks down -z
     float pitch{0.3f};  // Radians above the horizon
     float distance{50.0f};
@@ -25,9 +24,11 @@ struct OrbitCamera {
 
     // The point at the given distance behind the target, rotated by pitch around x and yaw around y
     [[nodiscard]] TriVector Eye() const {
-        const Motor pitchRotation = Motor::Rotation(-pitch * RAD_TO_DEG, BiVector(0, 0, 0, 1, 0, 0));
-        const Motor yawRotation = Motor::Rotation(yaw * RAD_TO_DEG, BiVector(0, 0, 0, 0, 1, 0));
+        const BiVector xAxis = BiVector::LineFromPoints(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+        const BiVector yAxis = BiVector::LineFromPoints(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        const Motor pitchRotation = Motor::Rotation(Angle::FromRadians(-pitch), xAxis);
+        const Motor yawRotation = Motor::Rotation(Angle::FromRadians(yaw), yAxis);
         const Motor orbit = TranslationMotor(target) * yawRotation * pitchRotation;
-        return ApplyMotor(orbit, TriVector(0.0f, 0.0f, distance));
+        return ApplyMotor(orbit, TriVector::Point(0.0f, 0.0f, distance));
     }
 };

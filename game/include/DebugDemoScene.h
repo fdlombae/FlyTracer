@@ -18,13 +18,13 @@ protected:
 private:
     void Reset();
 
-    OrbitCamera m_orbit{TriVector(0.0f, 3.0f, 0.0f), 0.5f, 0.4f, 25.0f, 8.0f, 50.0f};
+    OrbitCamera m_orbit{TriVector::Point(0.0f, 3.0f, 0.0f), 0.5f, 0.4f, 25.0f, 8.0f, 50.0f};
 
     // Animation
     float m_time{0.0f};
     float m_rotationSpeed{1.0f};
     bool m_paused{false};
-    const TriVector m_sphereStartPosition{0.0f, 3.0f, 0.0f, 1.0f};
+    const TriVector m_sphereStartPosition{TriVector::Point(0.0f, 3.0f, 0.0f)};
 
     uint32_t m_sphereId{0};
 

@@ -24,11 +24,11 @@ inline Mesh MakeMesh(const std::vector<TriVector>& positions, const std::vector<
 inline Mesh MakeBox(float x, float y, float z, const Motor& motor = Motor{1, 0, 0, 0, 0, 0, 0, 0}) {
     std::vector<TriVector> corners;
     for (uint32_t corner = 0; corner < 8; ++corner) {
-        const TriVector local((corner & 1 ? 0.5f : -0.5f) * x, (corner & 2 ? 0.5f : -0.5f) * y,
+        const TriVector local = TriVector::Point((corner & 1 ? 0.5f : -0.5f) * x, (corner & 2 ? 0.5f : -0.5f) * y,
                               (corner & 4 ? 0.5f : -0.5f) * z);
         corners.push_back(ApplyMotor(motor, local));
     }
-    const TriVector center = ApplyMotor(motor, TriVector(0.0f, 0.0f, 0.0f));
+    const TriVector center = ApplyMotor(motor, TriVector::Point(0.0f, 0.0f, 0.0f));
 
     std::vector<std::array<uint32_t, 3>> triangles;
     for (uint32_t axis = 0; axis < 3; ++axis) {

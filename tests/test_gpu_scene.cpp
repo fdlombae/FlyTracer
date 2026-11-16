@@ -19,14 +19,14 @@ TEST(GpuSceneTest, MaterialIsLinear) {
 }
 
 TEST(GpuSceneTest, PlaneIsNormalized) {
-    const Gpu::Plane plane = Gpu::Encode(Scene::Plane{Vector(-4.0f, 0.0f, 2.0f, 0.0f), {}}, 7);
+    const Gpu::Plane plane = Gpu::Encode(Scene::Plane{Vector::Plane(0.0f, 2.0f, 0.0f, -4.0f), {}}, 7);
     EXPECT_FLOAT_EQ(plane.normal[1], 1.0f);
     EXPECT_FLOAT_EQ(plane.e0, -2.0f);
     EXPECT_EQ(plane.materialIndex, 7u);
 }
 
 TEST(GpuSceneTest, LightIsLinearTimesIntensity) {
-    const Scene::Light light = Scene::Light::Directional(TriVector(0.0f, -2.0f, 0.0f, 0.0f), Scene::Color::White(), 3.0f);
+    const Scene::Light light = Scene::Light::Directional(TriVector::Direction(0.0f, -2.0f, 0.0f), Scene::Color::White(), 3.0f);
     const Gpu::Light gpu = Gpu::Encode(light);
     EXPECT_FLOAT_EQ(gpu.direction[1], -1.0f);
     EXPECT_FLOAT_EQ(gpu.color[0], 3.0f);
@@ -40,25 +40,25 @@ TEST(GpuSceneTest, PhongSpecular) {
 
 // The plane at infinity and lights without a direction cannot be drawn
 TEST(GpuSceneTest, RejectsDegenerateInput) {
-    EXPECT_THROW((void)Gpu::Encode(Scene::Plane{Vector(1.0f, 0.0f, 0.0f, 0.0f), {}}, 0), std::invalid_argument);
-    const TriVector none(0.0f, 0.0f, 0.0f, 0.0f);
+    EXPECT_THROW((void)Gpu::Encode(Scene::Plane{Vector::Plane(0.0f, 0.0f, 0.0f, 1.0f), {}}, 0), std::invalid_argument);
+    const TriVector none = TriVector::Direction(0.0f, 0.0f, 0.0f);
     EXPECT_THROW((void)Gpu::Encode(Scene::Light::Directional(none, Scene::Color::White(), 1.0f)), std::invalid_argument);
-    EXPECT_NO_THROW((void)Gpu::Encode(Scene::Light::Point(TriVector(0.0f, 1.0f, 0.0f), Scene::Color::White(), 1.0f, 5.0f)));
+    EXPECT_NO_THROW((void)Gpu::Encode(Scene::Light::Point(TriVector::Point(0.0f, 1.0f, 0.0f), Scene::Color::White(), 1.0f, 5.0f)));
 }
 
 // Without softness the spot cone has a hard edge: both cosines are the cone angle's
 TEST(GpuSceneTest, SpotSoftnessIsClamped) {
-    const TriVector down(0.0f, -1.0f, 0.0f, 0.0f);
-    const Scene::Light hard = Scene::Light::Spot(TriVector(0.0f, 5.0f, 0.0f), down, Scene::Color::White(), 1.0f, 10.0f, 30.0f, 0.0f);
-    const Scene::Light tooSoft = Scene::Light::Spot(TriVector(0.0f, 5.0f, 0.0f), down, Scene::Color::White(), 1.0f, 10.0f, 30.0f, 2.0f);
+    const TriVector down = TriVector::Direction(0.0f, -1.0f, 0.0f);
+    const Scene::Light hard = Scene::Light::Spot(TriVector::Point(0.0f, 5.0f, 0.0f), down, Scene::Color::White(), 1.0f, 10.0f, 30.0f, 0.0f);
+    const Scene::Light tooSoft = Scene::Light::Spot(TriVector::Point(0.0f, 5.0f, 0.0f), down, Scene::Color::White(), 1.0f, 10.0f, 30.0f, 2.0f);
     EXPECT_FLOAT_EQ(Gpu::Encode(hard).spotCosInner, Gpu::Encode(hard).spotCosOuter);
     EXPECT_FLOAT_EQ(Gpu::Encode(tooSoft).spotCosInner, 1.0f);
 }
 
 TEST(GpuSceneTest, VertexInterleavesUVs) {
     Vertex vertex{};
-    vertex.position = TriVector(1.0f, 2.0f, 3.0f);
-    vertex.normal = TriVector(0.0f, 1.0f, 0.0f, 0.0f);
+    vertex.position = TriVector::Point(1.0f, 2.0f, 3.0f);
+    vertex.normal = TriVector::Direction(0.0f, 1.0f, 0.0f);
     vertex.texCoord[0] = 0.25f;
     vertex.texCoord[1] = 0.75f;
 

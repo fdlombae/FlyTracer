@@ -47,6 +47,47 @@ bool isLayerAvailable(const char* name) {
                                [name](const VkLayerProperties& layer) { return strcmp(name, layer.layerName) == 0; });
 }
 
+bool isInstanceExtensionAvailable(const char* name) {
+    return std::ranges::any_of(
+        enumerate<VkExtensionProperties>(vkEnumerateInstanceExtensionProperties, nullptr),
+        [name](const VkExtensionProperties& extension) { return strcmp(name, extension.extensionName) == 0; });
+}
+
+// The features the renderer enables, chained for vkGetPhysicalDeviceFeatures2 and vkCreateDevice.
+// Only what is used: optional features like robustBufferAccess cost performance.
+struct DeviceFeatures {
+    VkPhysicalDeviceVulkan14Features vulkan14{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES};
+    VkPhysicalDeviceVulkan13Features vulkan13{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+                                              .pNext = &vulkan14};
+    VkPhysicalDeviceVulkan12Features vulkan12{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+                                              .pNext = &vulkan13};
+    VkPhysicalDeviceFeatures2 features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, .pNext = &vulkan12};
+
+    DeviceFeatures() = default;
+    DeviceFeatures(const DeviceFeatures&) = delete;
+    DeviceFeatures& operator=(const DeviceFeatures&) = delete;
+};
+
+// Texture indices vary per pixel, so the texture array needs non-uniform indexing. The raytracer's
+// buffers are tightly packed (scalar block layout). ImGui draws with dynamic rendering. The scene's
+// descriptors are pushed into the command buffer.
+std::vector<const char*> missingFeatures(VkPhysicalDevice device) {
+    DeviceFeatures supported;
+    vkGetPhysicalDeviceFeatures2(device, &supported.features);
+    const std::pair<const char*, VkBool32> required[]{
+        {"shaderSampledImageArrayNonUniformIndexing", supported.vulkan12.shaderSampledImageArrayNonUniformIndexing},
+        {"scalarBlockLayout", supported.vulkan12.scalarBlockLayout},
+        {"synchronization2", supported.vulkan13.synchronization2},
+        {"dynamicRendering", supported.vulkan13.dynamicRendering},
+        {"pushDescriptor", supported.vulkan14.pushDescriptor},
+    };
+    std::vector<const char*> missing;
+    for (const auto& [name, isSupported] : required) {
+        if (!isSupported) missing.push_back(name);
+    }
+    return missing;
+}
+
 int deviceTypeScore(VkPhysicalDeviceType type) {
     switch (type) {
         case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: return 1000;
@@ -106,6 +147,27 @@ void VulkanContext::WaitIdle() const {
     check(vkDeviceWaitIdle(m_device), "vkDeviceWaitIdle");
 }
 
+void VulkanContext::setName(VkObjectType type, uint64_t handle, const char* name) const {
+    if (m_setObjectName == nullptr) return;
+    const VkDebugUtilsObjectNameInfoEXT nameInfo{
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .objectType = type,
+        .objectHandle = handle,
+        .pObjectName = name,
+    };
+    m_setObjectName(m_device, &nameInfo);
+}
+
+void VulkanContext::BeginLabel(VkCommandBuffer cmdBuffer, const char* name) const {
+    if (m_beginLabel == nullptr) return;
+    const VkDebugUtilsLabelEXT label{.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, .pLabelName = name};
+    m_beginLabel(cmdBuffer, &label);
+}
+
+void VulkanContext::EndLabel(VkCommandBuffer cmdBuffer) const {
+    if (m_endLabel != nullptr) m_endLabel(cmdBuffer);
+}
+
 void VulkanContext::createInstance(bool withSurface) {
     std::vector<const char*> extensions;
     if (withSurface) {
@@ -148,8 +210,12 @@ void VulkanContext::createInstance(bool withSurface) {
 
     const char* validationLayer = "VK_LAYER_KHRONOS_validation";
     const bool validation = kEnableValidation && isLayerAvailable(validationLayer);
-    if (validation) {
+    // The validation layer brings the debug utils extension along
+    const bool debugUtils = validation || isInstanceExtensionAvailable(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    if (debugUtils) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+    if (validation) {
         createInfo.pNext = &validationFeatures;
         createInfo.enabledLayerCount = 1;
         createInfo.ppEnabledLayerNames = &validationLayer;
@@ -160,6 +226,12 @@ void VulkanContext::createInstance(bool withSurface) {
     createInfo.ppEnabledExtensionNames = extensions.data();
     check(vkCreateInstance(&createInfo, nullptr, &m_instance), "vkCreateInstance");
 
+    if (debugUtils) {
+        const auto load = [this](const char* name) { return vkGetInstanceProcAddr(m_instance, name); };
+        m_setObjectName = reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(load("vkSetDebugUtilsObjectNameEXT"));
+        m_beginLabel = reinterpret_cast<PFN_vkCmdBeginDebugUtilsLabelEXT>(load("vkCmdBeginDebugUtilsLabelEXT"));
+        m_endLabel = reinterpret_cast<PFN_vkCmdEndDebugUtilsLabelEXT>(load("vkCmdEndDebugUtilsLabelEXT"));
+    }
     if (validation) {
         auto createMessenger = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
             vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT"));
@@ -173,8 +245,15 @@ void VulkanContext::selectPhysicalDevice() {
     for (VkPhysicalDevice device : enumerate<VkPhysicalDevice>(vkEnumeratePhysicalDevices, m_instance)) {
         VkPhysicalDeviceProperties properties;
         vkGetPhysicalDeviceProperties(device, &properties);
-        if (properties.apiVersion < VK_API_VERSION_1_3) {
-            continue;  // Synchronization2 and dynamic rendering are used as core Vulkan 1.3
+        if (properties.apiVersion < VK_API_VERSION_1_4) {
+            std::cerr << properties.deviceName << " does not support Vulkan 1.4 (update its driver?)\n";
+            continue;
+        }
+        if (const auto missing = missingFeatures(device); !missing.empty()) {
+            std::cerr << properties.deviceName << " lacks the Vulkan features";
+            for (const char* feature : missing) std::cerr << ' ' << feature;
+            std::cerr << '\n';
+            continue;
         }
 
         // One queue family does compute (raytracing), graphics (ImGui) and present
@@ -196,7 +275,7 @@ void VulkanContext::selectPhysicalDevice() {
     }
 
     if (m_physicalDevice == VK_NULL_HANDLE) {
-        throw std::runtime_error("Failed to find a Vulkan 1.3 GPU with a graphics and compute queue");
+        throw std::runtime_error("Failed to find a Vulkan 1.4 GPU with the required features and a graphics and compute queue");
     }
 
     VkPhysicalDeviceProperties properties;
@@ -218,23 +297,16 @@ void VulkanContext::createDevice() {
         extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     }
 
-    // Only enable what is used: optional features like robustBufferAccess cost performance.
-    // Texture indices vary per pixel, so the texture array needs non-uniform indexing. The raytracer's
-    // buffers are tightly packed (scalar block layout). ImGui draws with dynamic rendering.
-    VkPhysicalDeviceVulkan13Features vulkan13Features{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-        .synchronization2 = VK_TRUE,
-        .dynamicRendering = VK_TRUE,
-    };
-    VkPhysicalDeviceVulkan12Features vulkan12Features{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-        .pNext = &vulkan13Features,
-        .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
-        .scalarBlockLayout = VK_TRUE,
-    };
+    // selectPhysicalDevice checked that the device has them (see missingFeatures)
+    DeviceFeatures enabled;
+    enabled.vulkan12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    enabled.vulkan12.scalarBlockLayout = VK_TRUE;
+    enabled.vulkan13.synchronization2 = VK_TRUE;
+    enabled.vulkan13.dynamicRendering = VK_TRUE;
+    enabled.vulkan14.pushDescriptor = VK_TRUE;
     const VkDeviceCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = &vulkan12Features,
+        .pNext = &enabled.features,
         .queueCreateInfoCount = 1,
         .pQueueCreateInfos = &queueCreateInfo,
         .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),

@@ -8,7 +8,7 @@
 
 namespace {
 
-const TriVector kOrigin(0.0f, 0.0f, 0.0f);
+const TriVector kOrigin = TriVector::Point(0.0f, 0.0f, 0.0f);
 
 struct Barycentric {
     float u;  // Weight of corner 1
@@ -80,7 +80,7 @@ void forRandomRays(float offset, Check check) {
     std::uniform_real_distribution<float> weight(-0.3f, 1.3f);
     for (int i = 0; i < 2000; ++i) {
         const auto randomPoint = [&](float spread) {
-            return TriVector(offset + spread * r(rng), spread * r(rng), spread * r(rng));
+            return TriVector::Point(offset + spread * r(rng), spread * r(rng), spread * r(rng));
         };
         const Mesh mesh = MakeMesh({randomPoint(1.0f), randomPoint(1.0f), randomPoint(1.0f)}, {{0, 1, 2}});
         const TriVector origin = randomPoint(4.0f);
@@ -93,7 +93,7 @@ void forRandomRays(float offset, Check check) {
 
         const std::array<double, 3> reference = referenceBarycentric(mesh, origin, direction);
         const Vector plane = p[0] & p[1] & p[2];
-        const double cosine = std::abs(dot(toDouble(TriVector(plane.e1(), plane.e2(), plane.e3(), 0.0f)),
+        const double cosine = std::abs(dot(toDouble(TriVector::Direction(plane.e1(), plane.e2(), plane.e3())),
                                            toDouble(direction))) / (plane.Norm() * direction.VNorm());
         const double nearestEdge = std::min({std::abs(reference[0]), std::abs(reference[1]),
                                              std::abs(1.0 - reference[0] - reference[1])});
@@ -116,8 +116,8 @@ void expectMatchesReference(const std::optional<Barycentric>& hit, const std::ar
 
 // Two triangles whose shared corners are separate vertices (e.g. with different normals)
 TEST(MeshLinesTest, SharedEdgeIsStoredOnce) {
-    const Mesh mesh = MakeMesh({TriVector(0, 0, 0), TriVector(1, 0, 0), TriVector(0, 1, 0),
-                                TriVector(0, 1, 0), TriVector(1, 0, 0), TriVector(1, 1, 0)},
+    const Mesh mesh = MakeMesh({TriVector::Point(0, 0, 0), TriVector::Point(1, 0, 0), TriVector::Point(0, 1, 0),
+                                TriVector::Point(0, 1, 0), TriVector::Point(1, 0, 0), TriVector::Point(1, 1, 0)},
                                {{0, 1, 2}, {3, 4, 5}});
     const MeshEdges edges = BuildEdges(mesh);
     ASSERT_EQ(edges.edges.size(), 5u);
@@ -129,7 +129,7 @@ TEST(MeshLinesTest, SharedEdgeIsStoredOnce) {
 }
 
 TEST(MeshLinesTest, OppositeEdgeRunsBetweenTheOtherCorners) {
-    const std::array corners{TriVector(0, 0, 0), TriVector(2, 0, 0), TriVector(0, 3, 0)};
+    const std::array corners{TriVector::Point(0, 0, 0), TriVector::Point(2, 0, 0), TriVector::Point(0, 3, 0)};
     const MeshEdges edges = BuildEdges(MakeMesh({corners[0], corners[1], corners[2]}, {{0, 1, 2}}));
     for (size_t i = 0; i < 3; ++i) {
         const EdgeUse use = edges.triangles[0].opposite[i];
@@ -143,8 +143,8 @@ TEST(MeshLinesTest, OppositeEdgeRunsBetweenTheOtherCorners) {
 
 // Four triangles around one edge, like two crossing quads
 TEST(MeshLinesTest, EdgeSharedByFourTriangles) {
-    const Mesh mesh = MakeMesh({TriVector(0, 0, 0), TriVector(0, 1, 0), TriVector(1, 0, 0), TriVector(-1, 0, 0),
-                                TriVector(0, 0, 1), TriVector(0, 0, -1)},
+    const Mesh mesh = MakeMesh({TriVector::Point(0, 0, 0), TriVector::Point(0, 1, 0), TriVector::Point(1, 0, 0), TriVector::Point(-1, 0, 0),
+                                TriVector::Point(0, 0, 1), TriVector::Point(0, 0, -1)},
                                {{0, 1, 2}, {1, 0, 3}, {0, 1, 4}, {1, 0, 5}});
     const MeshEdges edges = BuildEdges(mesh);
     EXPECT_EQ(edges.edges.size(), 9u);
@@ -173,9 +173,9 @@ TEST(MeshLinesTest, EdgeTestIsPreciseFarFromTheOrigin) {
 // same stored lines. (Möller-Trumbore in floats misses about a fifth of these rays.)
 TEST(MeshLinesTest, EdgeTestIsWatertight) {
     constexpr uint32_t kSides = 7;
-    const TriVector center(0.31f, 0.17f, -0.23f);
-    const TriVector u(0.83f, 0.31f, 0.11f, 0.0f);
-    const TriVector v(-0.17f, 0.29f, 0.79f, 0.0f);
+    const TriVector center = TriVector::Point(0.31f, 0.17f, -0.23f);
+    const TriVector u = TriVector::Direction(0.83f, 0.31f, 0.11f);
+    const TriVector v = TriVector::Direction(-0.17f, 0.29f, 0.79f);
     std::vector<TriVector> positions{center};
     std::vector<std::array<uint32_t, 3>> triangles;
     for (uint32_t i = 0; i < kSides; ++i) {
@@ -185,7 +185,7 @@ TEST(MeshLinesTest, EdgeTestIsWatertight) {
     }
     const MeshEdges edges = BuildEdges(MakeMesh(positions, triangles));
     const Vector plane = positions[0] & positions[1] & positions[2];
-    const TriVector front = TriVector(plane.e1(), plane.e2(), plane.e3(), 0.0f) * (-1.0f / plane.Norm());
+    const TriVector front = TriVector::Direction(plane.e1(), plane.e2(), plane.e3()) * (-1.0f / plane.Norm());
 
     std::mt19937 rng(3);
     std::uniform_real_distribution<float> r(-1.0f, 1.0f);

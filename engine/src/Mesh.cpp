@@ -26,16 +26,16 @@ void forEachTetrahedron(const Mesh& mesh, const TriVector& apex, Visit visit) {
 
 TriVector boundsCenter(const Mesh& mesh) {
     const AABB bounds = mesh.Bounds();
-    return TriVector(bounds.Centroid(0), bounds.Centroid(1), bounds.Centroid(2));
+    return TriVector::Point(bounds.Centroid(0), bounds.Centroid(1), bounds.Centroid(2));
 }
 
 // The plane through the origin perpendicular to a direction
 Vector planeAlong(const TriVector& direction) {
-    return Vector(0.0f, direction.e032(), direction.e013(), direction.e021());
+    return Vector::Plane(direction.e032(), direction.e013(), direction.e021(), 0.0f);
 }
 
-const std::array<Vector, 3> kAxisPlanes{Vector(0.0f, 1.0f, 0.0f, 0.0f), Vector(0.0f, 0.0f, 1.0f, 0.0f),
-                                        Vector(0.0f, 0.0f, 0.0f, 1.0f)};
+const std::array<Vector, 3> kAxisPlanes{Vector::Plane(1.0f, 0.0f, 0.0f, 0.0f), Vector::Plane(0.0f, 1.0f, 0.0f, 0.0f),
+                                        Vector::Plane(0.0f, 0.0f, 1.0f, 0.0f)};
 
 // A symmetric linear map is given by the images of the axis planes, map(x) = sum_j (x | e_j) frame[j].
 // The map rotated by R is R map(~R x R) ~R; its frame holds the images of the axis planes again.
@@ -43,7 +43,7 @@ std::array<Vector, 3> rotateFrame(const Motor& rotor, const std::array<Vector, 3
     std::array<Vector, 3> rotated;
     for (size_t i = 0; i < 3; ++i) {
         const Vector axis = ApplyMotor(~rotor, kAxisPlanes[i]);
-        Vector image(0.0f, 0.0f, 0.0f, 0.0f);
+        Vector image;
         for (size_t j = 0; j < 3; ++j) {
             image += frame[j] * (axis | kAxisPlanes[j]);
         }
@@ -55,9 +55,9 @@ std::array<Vector, 3> rotateFrame(const Motor& rotor, const std::array<Vector, 3
 // Jacobi's method with rotors ("Clean up your Mesh!", section 5c): every step rotates around one
 // axis by the angle that zeroes one off-diagonal element, until the frame is diagonal
 PrincipalInertia principalFrame(std::array<Vector, 3> frame) {
-    const std::array<BiVector, 3> axisLines{BiVector(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f),
-                                            BiVector(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f),
-                                            BiVector(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f)};
+    const std::array<BiVector, 3> axisLines{BiVector::LineFromPoints(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f),
+                                            BiVector::LineFromPoints(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f),
+                                            BiVector::LineFromPoints(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f)};
     // (p, q, k): rotating around axis k by a right-handed angle turns axis p towards axis q
     constexpr std::array<std::array<size_t, 3>, 3> kPlanes{{{0, 1, 2}, {1, 2, 0}, {2, 0, 1}}};
     const float scale = frame[0].Norm() + frame[1].Norm() + frame[2].Norm();
@@ -77,7 +77,7 @@ PrincipalInertia principalFrame(std::array<Vector, 3> frame) {
             const float qq = frame[q] | kAxisPlanes[q];
             // The smallest such angle, at most 45 degrees, so nearly diagonal frames are not swapped around
             const float angle = 0.5f * std::atan(2.0f * pq / (qq - pp));
-            const Motor step = Motor::Rotation(angle * RAD_TO_DEG, axisLines[k]);
+            const Motor step = Motor::Rotation(Angle::FromRadians(angle), axisLines[k]);
             frame = rotateFrame(step, frame);
             rotor = step * rotor;
         }
@@ -127,12 +127,12 @@ bool Mesh::LoadFromFile(const std::string& filename) {
         Vertex vertex{};
         if (index.vertex_index >= 0) {
             const float* p = &attrib.vertices[3 * index.vertex_index];
-            vertex.position = TriVector(p[0], p[1], p[2]);
+            vertex.position = TriVector::Point(p[0], p[1], p[2]);
         }
         // Some OBJ files reference normals (f v/vt/vn) without defining them (no vn lines)
         if (index.normal_index >= 0 && static_cast<size_t>(3 * index.normal_index + 2) < attrib.normals.size()) {
             const float* n = &attrib.normals[3 * index.normal_index];
-            vertex.normal = TriVector(n[0], n[1], n[2], 0.0f);
+            vertex.normal = TriVector::Direction(n[0], n[1], n[2]);
         }
         // OBJ has v = 0 at the bottom, image row 0 is the top
         if (index.texcoord_index >= 0) {
@@ -214,7 +214,7 @@ void Mesh::ComputeNormals() {
     for (auto& v : m_vertices) {
         const TriVector& sum = normalAt(v.position);
         const float length = sum.VNorm();
-        v.normal = length > 1e-8f ? sum * (1.0f / length) : TriVector(0.0f, 1.0f, 0.0f, 0.0f);
+        v.normal = length > 1e-8f ? sum * (1.0f / length) : TriVector::Direction(0.0f, 1.0f, 0.0f);
     }
 }
 
@@ -251,7 +251,7 @@ float Mesh::Volume() const {
 // Every tetrahedron's centroid (p0 + p1 + p2 + apex) / 4, weighted by its volume
 TriVector Mesh::CenterOfMass() const {
     const TriVector apex = boundsCenter(*this);
-    TriVector weightedSum(0.0f, 0.0f, 0.0f, 0.0f);
+    TriVector weightedSum = TriVector::Direction(0.0f, 0.0f, 0.0f);
     forEachTetrahedron(*this, apex, [&](const TriVector& p0, const TriVector& p1, const TriVector& p2, float volume) {
         weightedSum += (p0 + p1 + p2 + apex) * volume;
     });
@@ -320,7 +320,7 @@ void Mesh::GenerateCylindricalUVs() {
 
 void Mesh::StandOnOrigin() {
     const AABB bounds = Bounds();
-    const Motor translation = TranslationMotor(-bounds.Centroid(0), -bounds.min[1], -bounds.Centroid(2));
+    const Motor translation = Motor::Translation(-bounds.Centroid(0), -bounds.min[1], -bounds.Centroid(2));
     for (auto& v : m_vertices) {
         v.position = ApplyMotor(translation, v.position);
     }

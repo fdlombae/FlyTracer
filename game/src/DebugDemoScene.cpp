@@ -14,11 +14,11 @@ void DebugDemoScene::OnInit() {
                            Scene::Material::Metal(Scene::Color(0.8f, 0.3f, 0.3f), 0.2f));
 
     // Some static spheres for reference
-    AddSphere(TriVector(5.0f, 1.0f, 0.0f), 1.0f, Scene::Material::Glossy(Scene::Color(0.3f, 0.3f, 0.8f), 0.1f));
-    AddSphere(TriVector(-5.0f, 1.0f, 0.0f), 1.0f, Scene::Material::Glossy(Scene::Color(0.3f, 0.8f, 0.3f), 0.1f));
-    AddSphere(TriVector(0.0f, 1.0f, 5.0f), 1.0f, Scene::Material::Glossy(Scene::Color(0.8f, 0.8f, 0.3f), 0.1f));
+    AddSphere(TriVector::Point(5.0f, 1.0f, 0.0f), 1.0f, Scene::Material::Glossy(Scene::Color(0.3f, 0.3f, 0.8f), 0.1f));
+    AddSphere(TriVector::Point(-5.0f, 1.0f, 0.0f), 1.0f, Scene::Material::Glossy(Scene::Color(0.3f, 0.8f, 0.3f), 0.1f));
+    AddSphere(TriVector::Point(0.0f, 1.0f, 5.0f), 1.0f, Scene::Material::Glossy(Scene::Color(0.8f, 0.8f, 0.3f), 0.1f));
 
-    AddPointLight(TriVector(5.0f, 10.0f, 5.0f), Scene::Color(1.0f, 1.0f, 1.0f), 1.5f, 50.0f);
+    AddPointLight(TriVector::Point(5.0f, 10.0f, 5.0f), Scene::Color(1.0f, 1.0f, 1.0f), 1.5f, 50.0f);
 }
 
 void DebugDemoScene::OnUpdate(float deltaTime) {
@@ -29,16 +29,16 @@ void DebugDemoScene::OnUpdate(float deltaTime) {
     // Animate the main sphere in a circle around the vertical line through its start, bobbing up and down
     if (auto* sphere = GetSphere(m_sphereId)) {
         const float radius = 3.0f;
-        const BiVector axis = m_sphereStartPosition & TriVector(0.0f, 1.0f, 0.0f, 0.0f);
-        const Motor motor = TranslationMotor(0.0f, 0.5f * std::sin(3.0f * m_time), 0.0f) *
-                            Motor::Rotation(m_time * RAD_TO_DEG, axis);
-        sphere->center = ApplyMotor(motor, m_sphereStartPosition + TriVector(radius, 0.0f, 0.0f, 0.0f));
+        const BiVector axis = m_sphereStartPosition & TriVector::Direction(0.0f, 1.0f, 0.0f);
+        const Motor motor = Motor::Translation(0.0f, 0.5f * std::sin(3.0f * m_time), 0.0f) *
+                            Motor::Rotation(Angle::FromRadians(m_time), axis);
+        sphere->center = ApplyMotor(motor, m_sphereStartPosition + TriVector::Direction(radius, 0.0f, 0.0f));
     }
 
     // === Debug Visualization ===
 
     if (m_showAxes) {
-        DrawDebugAxes(TriVector(0.0f, 0.0f, 0.0f), 5.0f);
+        DrawDebugAxes(TriVector::Point(0.0f, 0.0f, 0.0f), 5.0f);
         if (auto* sphere = GetSphere(m_sphereId)) {
             DrawDebugAxes(sphere->center, 1.0f);
         }
@@ -50,39 +50,40 @@ void DebugDemoScene::OnUpdate(float deltaTime) {
         const float gridStep = 2.0f;
         const Scene::Color gridColor(0.5f, 0.5f, 0.5f);
         for (float x = -gridSize; x <= gridSize; x += gridStep) {
-            DrawDebugLine(TriVector(x, 0.01f, -gridSize), TriVector(x, 0.01f, gridSize), gridColor);
+            DrawDebugLine(TriVector::Point(x, 0.01f, -gridSize), TriVector::Point(x, 0.01f, gridSize), gridColor);
         }
         for (float z = -gridSize; z <= gridSize; z += gridStep) {
-            DrawDebugLine(TriVector(-gridSize, 0.01f, z), TriVector(gridSize, 0.01f, z), gridColor);
+            DrawDebugLine(TriVector::Point(-gridSize, 0.01f, z), TriVector::Point(gridSize, 0.01f, z), gridColor);
         }
     }
 
     // Points at each static sphere
-    DrawDebugPoint(TriVector(5.0f, 1.0f, 0.0f, 1.0f), 0.3f, Scene::Color::Cyan());
-    DrawDebugPoint(TriVector(-5.0f, 1.0f, 0.0f, 1.0f), 0.3f, Scene::Color::Magenta());
-    DrawDebugPoint(TriVector(0.0f, 1.0f, 5.0f, 1.0f), 0.3f, Scene::Color::Yellow());
+    DrawDebugPoint(TriVector::Point(5.0f, 1.0f, 0.0f), 0.3f, Scene::Color::Cyan());
+    DrawDebugPoint(TriVector::Point(-5.0f, 1.0f, 0.0f), 0.3f, Scene::Color::Magenta());
+    DrawDebugPoint(TriVector::Point(0.0f, 1.0f, 5.0f), 0.3f, Scene::Color::Yellow());
 
     // BiVector lines (Plücker lines)
     if (m_showLines) {
         // A line as the regressive product (join) of two points: p1 & p2
-        TriVector p1(0.0f, 2.0f, 0.0f, 1.0f);
-        TriVector p2(5.0f, 4.0f, 5.0f, 1.0f);
+        TriVector p1 = TriVector::Point(0.0f, 2.0f, 0.0f);
+        TriVector p2 = TriVector::Point(5.0f, 4.0f, 5.0f);
         BiVector line1 = p1 & p2;
         DrawDebugLine(line1, 8.0f, Scene::Color::Yellow());
 
         // Animated rotating line
         const float angle = m_time;
-        TriVector pA(0.0f, 5.0f, 0.0f, 1.0f);
-        TriVector pB(3.0f, 5.0f, 3.0f, 1.0f);
+        TriVector pA = TriVector::Point(0.0f, 5.0f, 0.0f);
+        TriVector pB = TriVector::Point(3.0f, 5.0f, 3.0f);
         BiVector line2 = pA & pB;
 
-        const Motor rotation = Motor::Rotation(angle * RAD_TO_DEG, BiVector(0, 0, 0, 0, 1, 0));
+        const BiVector yAxis = BiVector::LineFromPoints(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        const Motor rotation = Motor::Rotation(Angle::FromRadians(angle), yAxis);
         BiVector rotatedLine = (rotation * line2 * ~rotation).Grade2();
         DrawDebugLine(rotatedLine, 6.0f, Scene::Color::Cyan());
 
         // Line connecting two static spheres
-        TriVector sphereA(5.0f, 1.0f, 0.0f, 1.0f);
-        TriVector sphereB(-5.0f, 1.0f, 0.0f, 1.0f);
+        TriVector sphereA = TriVector::Point(5.0f, 1.0f, 0.0f);
+        TriVector sphereB = TriVector::Point(-5.0f, 1.0f, 0.0f);
         BiVector connectingLine = sphereA & sphereB;
         DrawDebugLine(connectingLine, 7.0f, Scene::Color::Magenta());
     }

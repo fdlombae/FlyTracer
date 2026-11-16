@@ -8,6 +8,7 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -28,23 +29,24 @@ public:
 protected:
     void OnInit() override {
         AddGroundPlane(0.0f, Scene::Material::Lambert(Scene::Color(0.6f, 0.6f, 0.6f)));
-        AddSphere(TriVector(-1.5f, 1.0f, 0.0f), 1.0f, Scene::Material::Metal(Scene::Color(0.9f, 0.4f, 0.3f), 0.1f));
-        AddPointLight(TriVector(2.0f, 6.0f, 4.0f), Scene::Color::White(), 3.0f, 20.0f);
+        AddSphere(TriVector::Point(-1.5f, 1.0f, 0.0f), 1.0f, Scene::Material::Metal(Scene::Color(0.9f, 0.4f, 0.3f), 0.1f));
+        AddPointLight(TriVector::Point(2.0f, 6.0f, 4.0f), Scene::Color::White(), 3.0f, 20.0f);
 
-        auto mesh = std::make_unique<Mesh>(MakeMesh({TriVector(0, 0, 0), TriVector(1, 0, 0), TriVector(0, 1, 0), TriVector(0, 0, 1)},
+        auto mesh = std::make_unique<Mesh>(MakeMesh({TriVector::Point(0, 0, 0), TriVector::Point(1, 0, 0), TriVector::Point(0, 1, 0), TriVector::Point(0, 0, 1)},
                                                     {{0, 2, 1}, {0, 1, 3}, {0, 3, 2}, {1, 2, 3}}));
         mesh->ComputeNormals();
         mesh->AddMaterial(Scene::Material::PBR(Scene::Color(0.2f, 0.5f, 0.9f), 0.0f, 0.4f));
         const uint32_t meshId = AddMesh(std::move(mesh));
 
-        const Motor transform = TranslationMotor(1.5f, 0.0f, 0.0f) *
-                                Motor::Rotation(30.0f, BiVector(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f));
+        const Motor transform = Motor::Translation(1.5f, 0.0f, 0.0f) *
+                                Motor::Rotation(Angle::FromDegrees(30.0f),
+                                                BiVector::LineFromPoints(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f));
         const uint32_t instanceId = AddMeshInstance(meshId, transform);
         GetInstance(instanceId)->scale = 1.5f;
-        *GetInstance(instanceId) = GetInstance(instanceId)->Reflected(Vector(0.0f, 0.0f, 0.0f, 1.0f));
+        *GetInstance(instanceId) = GetInstance(instanceId)->Reflected(Vector::Plane(0.0f, 0.0f, 1.0f, 0.0f));
 
-        SetCamera(TriVector(0.0f, 2.5f, 6.0f), TriVector(0.0f, 0.8f, 0.0f));
-        DrawDebugLine(TriVector(-3.0f, 0.01f, 1.5f), TriVector(3.0f, 0.01f, 1.5f), Scene::Color::Yellow());
+        SetCamera(TriVector::Point(0.0f, 2.5f, 6.0f), TriVector::Point(0.0f, 0.8f, 0.0f));
+        DrawDebugLine(TriVector::Point(-3.0f, 0.01f, 1.5f), TriVector::Point(3.0f, 0.01f, 1.5f), Scene::Color::Yellow());
     }
 };
 
@@ -85,7 +87,7 @@ TEST(RenderTest, SceneChangesAfterInitAreDrawn) {
     const auto context = TryCreateContext();
     if (!context) GTEST_SKIP() << "No usable Vulkan device";
     OpenScene scene;
-    scene.SetCamera(TriVector(0.0f, 0.0f, 5.0f), TriVector(0.0f, 0.0f, 0.0f));
+    scene.SetCamera(TriVector::Point(0.0f, 0.0f, 5.0f), TriVector::Point(0.0f, 0.0f, 0.0f));
     RaytracingPass raytracing(*context, VkExtent2D{16, 16}, ExecutableRelativePath("shaders").string(), 1);
     raytracing.UploadMeshes(scene.GetMeshes());
     VulkanHelpers::CommandSubmitter submitter = MakeSubmitter(*context);
@@ -103,7 +105,7 @@ TEST(RenderTest, SceneChangesAfterInitAreDrawn) {
     auto mesh = std::make_unique<Mesh>(MakeBox(2.0f, 2.0f, 2.0f));
     mesh->AddMaterial(Scene::Material::Flat(Scene::Color(1.0f, 0.0f, 0.0f)));
     const uint32_t meshId = scene.AddMesh(std::move(mesh));
-    const uint32_t instanceId = scene.AddMeshInstance(meshId, TriVector(0.0f, 0.0f, 0.0f));
+    const uint32_t instanceId = scene.AddMeshInstance(meshId, TriVector::Point(0.0f, 0.0f, 0.0f));
     const auto red = centerPixel();
     EXPECT_GT(red[0], 150);
     EXPECT_LT(red[1], 50);
@@ -115,4 +117,36 @@ TEST(RenderTest, SceneChangesAfterInitAreDrawn) {
 
     scene.GetInstance(instanceId)->scale = 0.0f;
     EXPECT_EQ(centerPixel(), sky);
+}
+
+// Reloading the shader keeps rendering the same image; the exposure setting scales it
+TEST(RenderTest, ReloadsShaderAndAppliesExposure) {
+    const auto context = TryCreateContext();
+    if (!context) GTEST_SKIP() << "No usable Vulkan device";
+    OpenScene scene;
+    scene.SetCamera(TriVector::Point(0.0f, 0.0f, 5.0f), TriVector::Point(0.0f, 0.0f, 0.0f));
+    scene.AddSphere(TriVector::Point(0.0f, 0.0f, 0.0f), 2.0f, Scene::Material::Flat(Scene::Color(0.5f, 0.5f, 0.5f)));
+    RaytracingPass raytracing(*context, VkExtent2D{16, 16}, ExecutableRelativePath("shaders").string(), 1);
+    VulkanHelpers::CommandSubmitter submitter = MakeSubmitter(*context);
+    uint32_t frame = 0;
+    const auto centerRed = [&] {
+        submitter.Submit([&](VkCommandBuffer cmd) {
+            raytracing.Record(cmd, frame++ % RaytracingPass::kFramesInFlight, scene);
+        });
+        const RgbImage image = ReadOutput(*context, raytracing, submitter);
+        return image.pixels[(size_t{image.height / 2} * image.width + image.width / 2) * 3];
+    };
+    const auto before = centerRed();
+
+    raytracing.ReloadShader();
+    EXPECT_EQ(centerRed(), before);
+
+    raytracing.SetExposure(0.25f);
+    EXPECT_LT(centerRed(), before);
+}
+
+TEST(RenderTest, MissingShaderThrows) {
+    const auto context = TryCreateContext();
+    if (!context) GTEST_SKIP() << "No usable Vulkan device";
+    EXPECT_THROW(RaytracingPass(*context, VkExtent2D{16, 16}, "no_such_directory", 1), std::runtime_error);
 }

@@ -1,4 +1,4 @@
-// The interface between the engine and engine/shaders/raytracer.comp: descriptor bindings and limits.
+// The interface between the engine and engine/shaders/raytracer.comp: descriptor sets, bindings and limits.
 // C++ and GLSL both include this file, so it only holds #defines.
 
 #ifndef SHADER_INTERFACE_H
@@ -19,8 +19,11 @@
 #define BINDING_INSTANCES 12
 #define BINDING_SCENE_PAIRS 13
 #define BINDING_DEBUG_LINES 14
-#define BINDING_TEXTURES 15
-#define BINDING_COUNT 16
+#define BINDING_COUNT 15            // Bindings of the scene set, which is pushed every frame
+
+#define SET_SCENE 0
+#define SET_TEXTURES 1             // The texture array has a set of its own, written when the meshes change
+#define BINDING_TEXTURES 0
 
 #define MAX_TEXTURES 64            // Texture slots; slot 0 is white, for untextured materials
 #define BVH_STACK_SIZE 32          // Entries of the traversal stack; BuildBVH keeps the depth below it

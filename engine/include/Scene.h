@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FlyFish.h"
+#include "PGA.h"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -75,14 +75,14 @@ struct Material {
 // Primitives
 // ============================================================================
 struct Sphere {
-    TriVector center{0.0f, 0.0f, 0.0f};
+    TriVector center{TriVector::Point(0.0f, 0.0f, 0.0f)};
     float radius{1.0f};
     Material material;
 };
 
-// Plane e1*x + e2*y + e3*z + e0 = 0, the side its normal (e1, e2, e3) points to is the front
+// Plane a*x + b*y + c*z + d = 0 (Vector::Plane(a, b, c, d)), the side its normal (a, b, c) points to is the front
 struct Plane {
-    Vector plane{0.0f, 0.0f, 1.0f, 0.0f};
+    Vector plane{Vector::Plane(0.0f, 1.0f, 0.0f, 0.0f)};
     Material material;
 };
 
@@ -97,8 +97,8 @@ enum class LightType : int32_t {
 
 struct Light {
     LightType type{LightType::Point};
-    TriVector position{0.0f, 0.0f, 0.0f};          // Point and spot lights
-    TriVector direction{0.0f, -1.0f, 0.0f, 0.0f};  // Direction the light travels (directional and spot)
+    TriVector position{TriVector::Point(0.0f, 0.0f, 0.0f)};        // Point and spot lights
+    TriVector direction{TriVector::Direction(0.0f, -1.0f, 0.0f)};  // Direction the light travels (directional and spot)
     Color color;
     float intensity{1.0f};
     // Point and spot lights fall off with range^2 / (range^2 + distance^2): half intensity at the

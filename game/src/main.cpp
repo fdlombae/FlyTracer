@@ -22,13 +22,15 @@ void printHelp() {
         "  --width <N>      Window width (default: 1280)\n"
         "  --height <N>     Window height (default: 720)\n"
         "  --title <str>    Window title\n"
-        "  --scene <name>   Scene:";
-    for (const std::string_view name : kSceneNames) {
-        std::cout << " " << name;
+        "  --scene <name>   Scene (the first one is the default):";
+    for (const SceneEntry& scene : Scenes()) {
+        std::cout << " " << scene.name;
     }
     std::cout << "\n"
         "  --fullscreen     Run in fullscreen mode\n"
         "  --no-vsync       Disable vsync\n"
+        "  --render-scale <F>  Raytraced pixels per window pixel along each side, 0.25 to 1\n"
+        "                   (default: 1); lower is faster\n"
         "  --benchmark [N]  Render every scene headless for N frames (default: 200) at\n"
         "                   --width x --height pixels (default: 1920 x 1080) and print the\n"
         "                   raytracing times\n"
@@ -39,8 +41,8 @@ void printHelp() {
 int runBenchmark(const FlyTracer::AppConfig& config, VkExtent2D extent, uint32_t frames, const std::string& csvPath) {
     const std::string resourceDir = ExecutableRelativePath(config.resourceDirectory).string();
     std::vector<BenchmarkScene> scenes;
-    for (const std::string_view name : kSceneNames) {
-        scenes.push_back({std::string(name), [name, resourceDir] { return CreateScene(name, resourceDir); }});
+    for (const SceneEntry& scene : Scenes()) {
+        scenes.push_back({std::string(scene.name), [scene, resourceDir] { return scene.create(resourceDir); }});
     }
 
     const BenchmarkReport report = RunBenchmark({
@@ -69,8 +71,7 @@ int main(int argc, char* argv[]) {
     try {
         FlyTracer::AppConfig config;
         (void)config.loadFromFile(ExecutableRelativePath("resources/config.cfg").string());
-        std::string sceneName = "bireflection";
-        bool titleGiven = false;
+        std::string sceneName(Scenes().front().name);
         bool benchmark = false;
         int benchmarkFrames = 200;
         std::string benchmarkCsv;
@@ -93,13 +94,16 @@ int main(int argc, char* argv[]) {
                 }
             } else if (arg == "--title" && i + 1 < argc) {
                 config.windowTitle = argv[++i];
-                titleGiven = true;
             } else if (arg == "--scene" && i + 1 < argc) {
                 sceneName = argv[++i];
             } else if (arg == "--fullscreen") {
                 config.fullscreen = true;
             } else if (arg == "--no-vsync") {
                 config.vsync = false;
+            } else if (arg == "--render-scale" && i + 1 < argc) {
+                if (!FlyTracer::parseNumber(argv[++i], config.renderScale)) {
+                    std::cerr << "Invalid render scale, using default\n";
+                }
             } else if (arg == "--benchmark") {
                 benchmark = true;
                 if (i + 1 < argc && FlyTracer::parseNumber(argv[i + 1], benchmarkFrames)) {
@@ -116,9 +120,6 @@ int main(int argc, char* argv[]) {
         if (benchmark) {
             return runBenchmark(config, benchmarkExtent, static_cast<uint32_t>(std::max(benchmarkFrames, 1)),
                                 benchmarkCsv);
-        }
-        if (sceneName == "hornet" && !titleGiven) {
-            config.windowTitle = "HornetTracer";
         }
         Application(config, CreateScene(sceneName, ExecutableRelativePath(config.resourceDirectory).string())).run();
     } catch (const std::exception& e) {

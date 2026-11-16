@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Camera.h"
-#include "FlyFish.h"
+#include "PGA.h"
 #include "Input.h"
 #include "Mesh.h"
 #include "Scene.h"
@@ -68,7 +68,7 @@ protected:
 
     // Camera
     void SetCamera(const TriVector& eye, const TriVector& target,
-                   const TriVector& up = TriVector(0.0f, 1.0f, 0.0f, 0.0f)) noexcept;
+                   const TriVector& up = TriVector::Direction(0.0f, 1.0f, 0.0f)) noexcept;
     void SetCameraFov(float fovDegrees) noexcept { m_camera.fov = fovDegrees; }
     void SetExposure(float exposure) noexcept { m_camera.exposure = exposure; }
 
@@ -81,6 +81,8 @@ protected:
 
     uint32_t AddMeshInstance(uint32_t meshId, const TriVector& position, std::string_view name = {});
     uint32_t AddMeshInstance(uint32_t meshId, const Motor& transform, std::string_view name = {});
+    // A complete instance, e.g. another one's Reflected(plane)
+    uint32_t AddMeshInstance(const MeshInstance& instance);
     [[nodiscard]] MeshInstance* GetInstance(uint32_t instanceId) noexcept;
     [[nodiscard]] MeshInstance* FindInstance(std::string_view name) noexcept;
     void SetInstanceTransform(uint32_t instanceId, const Motor& transform);

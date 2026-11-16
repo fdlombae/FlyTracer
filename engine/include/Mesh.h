@@ -6,11 +6,11 @@
 #include <cstdint>
 #include "BVH.h"
 #include "Scene.h"
-#include "FlyFish.h"
+#include "PGA.h"
 
 struct Vertex {
     TriVector position;
-    TriVector normal{0.0f, 0.0f, 0.0f, 0.0f};  // A direction (e123 = 0)
+    TriVector normal{TriVector::Direction(0.0f, 0.0f, 0.0f)};  // A direction (e123 = 0)
     float texCoord[2];
 };
 

@@ -23,41 +23,41 @@ std::vector<std::byte> concatenatedBytes(const auto&... ranges) {
 
 RaytracingPass::RaytracingPass(const VulkanContext& context, VkExtent2D extent, const std::string& shaderDir,
                                uint32_t maxBounces)
-    : m_context(context), m_maxBounces(maxBounces), m_timer(context, kFramesInFlight)
+    : m_context(context), m_shaderPath(shaderDir + "/raytracer.comp.spv"), m_maxBounces(maxBounces),
+      m_timer(context, kFramesInFlight)
 {
-    createDescriptors(shaderDir);
+    createDescriptors();
+    ReloadShader();
     createImages(extent);
     UploadMeshes({});  // Valid (empty) mesh data until the scene's meshes arrive
 }
 
-void RaytracingPass::createDescriptors(const std::string& shaderDir) {
+void RaytracingPass::createDescriptors() {
     const VkDevice device = m_context.Device();
 
+    // The scene set is pushed into every frame's command buffer, so no descriptor sets have to be
+    // kept up to date per frame in flight
     std::array<VkDescriptorSetLayoutBinding, BINDING_COUNT> bindings{};
     for (uint32_t binding = 0; binding < BINDING_COUNT; ++binding) {
         bindings[binding] = {binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     }
     bindings[BINDING_ACCUMULATION_IMAGE].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     bindings[BINDING_OUTPUT_IMAGE].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    bindings[BINDING_TEXTURES].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    bindings[BINDING_TEXTURES].descriptorCount = kMaxTextures;
-    m_descriptorSetLayout = VulkanHelpers::createDescriptorSetLayout(device, bindings);
+    m_sceneSetLayout = VulkanHelpers::createDescriptorSetLayout(
+        device, bindings, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT);
 
-    const std::array<VkDescriptorPoolSize, 3> poolSizes{{
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2 * kFramesInFlight},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, (BINDING_COUNT - 3) * kFramesInFlight},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kMaxTextures * kFramesInFlight},
-    }};
-    m_descriptorPool = VulkanHelpers::createDescriptorPool(device, kFramesInFlight, poolSizes);
-    for (FrameBuffers& frame : m_frames) {
-        frame.descriptorSet = VulkanHelpers::allocateDescriptorSet(device, m_descriptorPool.get(),
-                                                                   m_descriptorSetLayout.get());
-    }
+    // The texture array is too large to push (maxPushDescriptors is only guaranteed to be 32) and
+    // changes only with the meshes
+    const VkDescriptorSetLayoutBinding textureBinding{BINDING_TEXTURES, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                      kMaxTextures, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+    m_textureSetLayout = VulkanHelpers::createDescriptorSetLayout(device, {&textureBinding, 1});
+    const VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kMaxTextures};
+    m_descriptorPool = VulkanHelpers::createDescriptorPool(device, 1, {&poolSize, 1});
+    m_textureSet = VulkanHelpers::allocateDescriptorSet(device, m_descriptorPool.get(), m_textureSetLayout.get());
 
-    m_pipelineLayout = VulkanHelpers::createPipelineLayout(device, m_descriptorSetLayout.get(),
-                                                           sizeof(Gpu::PushConstants));
-    m_pipeline = VulkanHelpers::createComputePipeline(device, m_pipelineLayout.get(),
-                                                      shaderDir + "/raytracer.comp.spv");
+    const std::array setLayouts{m_sceneSetLayout.get(), m_textureSetLayout.get()};
+    static_assert(SET_SCENE == 0 && SET_TEXTURES == 1);
+    m_pipelineLayout = VulkanHelpers::createPipelineLayout(device, setLayouts, sizeof(Gpu::PushConstants));
 
     const VkSamplerCreateInfo samplerInfo{
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -72,6 +72,13 @@ void RaytracingPass::createDescriptors(const std::string& shaderDir) {
     VkSampler sampler;
     VulkanHelpers::check(vkCreateSampler(device, &samplerInfo, nullptr, &sampler), "vkCreateSampler");
     m_sampler = VulkanHelpers::UniqueSampler(device, sampler);
+}
+
+void RaytracingPass::ReloadShader() {
+    m_context.WaitIdle();
+    m_pipeline = VulkanHelpers::createComputePipeline(m_context.Device(), m_pipelineLayout.get(), m_shaderPath);
+    m_context.SetName(VK_OBJECT_TYPE_PIPELINE, m_pipeline.get(), "Raytracer pipeline");
+    m_previousFrameState.clear();
 }
 
 void RaytracingPass::createImages(VkExtent2D extent) {
@@ -90,11 +97,8 @@ void RaytracingPass::createImages(VkExtent2D extent) {
         }
     });
 
-    for (const FrameBuffers& frame : m_frames) {
-        VulkanHelpers::writeStorageImageDescriptor(device, frame.descriptorSet, BINDING_ACCUMULATION_IMAGE,
-                                                   m_accumulation.view());
-        VulkanHelpers::writeStorageImageDescriptor(device, frame.descriptorSet, BINDING_OUTPUT_IMAGE, m_output.view());
-    }
+    m_context.SetName(VK_OBJECT_TYPE_IMAGE, m_accumulation.image(), "Accumulation image");
+    m_context.SetName(VK_OBJECT_TYPE_IMAGE, m_output.image(), "Raytracer output image");
     m_previousFrameState.clear();
     m_sampleIndex = 0;
 }
@@ -144,45 +148,92 @@ void RaytracingPass::UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& mesh
     }
     uploader.submit();
 
-    const std::array<std::pair<uint32_t, VkBuffer>, 6> meshBuffers{{
-        {BINDING_VERTICES, m_vertices.buffer()},
-        {BINDING_TRIANGLES, m_triangles.buffer()},
-        {BINDING_EDGES, m_edges.buffer()},
-        {BINDING_EDGE_TRIANGLES, m_edgeTriangles.buffer()},
-        {BINDING_MESH_PAIRS, m_meshPairs.buffer()},
-        {BINDING_MESH_ROOT_PAIRS, m_meshRootPairs.buffer()},
-    }};
+    const std::pair<const VulkanHelpers::Buffer&, const char*> meshBuffers[]{
+        {m_vertices, "Mesh vertices"},
+        {m_triangles, "Mesh triangles"},
+        {m_edges, "Mesh edges"},
+        {m_edgeTriangles, "Mesh edge triangles"},
+        {m_meshPairs, "Mesh BVH node pairs"},
+        {m_meshRootPairs, "Mesh root pairs"},
+    };
+    for (const auto& [buffer, name] : meshBuffers) {
+        m_context.SetName(VK_OBJECT_TYPE_BUFFER, buffer.buffer(), name);
+    }
     // Unused slots show the white texture
     std::array<VkDescriptorImageInfo, kMaxTextures> textures{};
     for (uint32_t slot = 0; slot < kMaxTextures; ++slot) {
         const VulkanHelpers::Image& texture = slot < m_textures.size() ? m_textures[slot] : m_textures.front();
         textures[slot] = {m_sampler.get(), texture.view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
     }
-    for (const FrameBuffers& frame : m_frames) {
-        for (const auto& [binding, buffer] : meshBuffers) {
-            VulkanHelpers::writeStorageBufferDescriptor(device, frame.descriptorSet, binding, buffer);
-        }
-        VulkanHelpers::writeImageDescriptors(device, frame.descriptorSet, BINDING_TEXTURES,
-                                             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, textures);
-    }
+    VulkanHelpers::writeImageDescriptors(device, m_textureSet, BINDING_TEXTURES,
+                                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, textures);
     m_meshTable = std::move(data.table);
     m_previousFrameState.clear();
 }
 
 template<typename T>
-void RaytracingPass::writeFrameBuffer(VulkanHelpers::Buffer& buffer, VkDescriptorSet set, uint32_t binding,
-                                      const std::vector<T>& data) {
+void RaytracingPass::writeFrameBuffer(VulkanHelpers::Buffer& buffer, const std::vector<T>& data, const char* name) {
     const VkDeviceSize dataSize = sizeof(T) * data.size();
     if (buffer.buffer() == VK_NULL_HANDLE || buffer.size() < dataSize) {
         const VkDeviceSize capacity = std::max({dataSize, 2 * buffer.size(), VkDeviceSize{sizeof(T)}});
         buffer = VulkanHelpers::Buffer(m_context.Device(), m_context.PhysicalDevice(), capacity,
                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                        VulkanHelpers::hostWriteMemoryProperties(m_context.PhysicalDevice()));
-        VulkanHelpers::writeStorageBufferDescriptor(m_context.Device(), set, binding, buffer.buffer());
+        m_context.SetName(VK_OBJECT_TYPE_BUFFER, buffer.buffer(), name);
     }
     if (dataSize > 0) {
         buffer.write(data.data(), dataSize);
     }
+}
+
+void RaytracingPass::pushSceneDescriptors(VkCommandBuffer cmdBuffer, const FrameBuffers& frame) const {
+    const std::pair<uint32_t, VkImageView> images[]{
+        {BINDING_ACCUMULATION_IMAGE, m_accumulation.view()},
+        {BINDING_OUTPUT_IMAGE, m_output.view()},
+    };
+    const std::pair<uint32_t, VkBuffer> buffers[]{
+        {BINDING_VERTICES, m_vertices.buffer()},
+        {BINDING_TRIANGLES, m_triangles.buffer()},
+        {BINDING_EDGES, m_edges.buffer()},
+        {BINDING_EDGE_TRIANGLES, m_edgeTriangles.buffer()},
+        {BINDING_MESH_PAIRS, m_meshPairs.buffer()},
+        {BINDING_MESH_ROOT_PAIRS, m_meshRootPairs.buffer()},
+        {BINDING_MATERIALS, frame.materials.buffer()},
+        {BINDING_SPHERES, frame.spheres.buffer()},
+        {BINDING_PLANES, frame.planes.buffer()},
+        {BINDING_LIGHTS, frame.lights.buffer()},
+        {BINDING_INSTANCES, frame.instances.buffer()},
+        {BINDING_SCENE_PAIRS, frame.scenePairs.buffer()},
+        {BINDING_DEBUG_LINES, frame.debugLines.buffer()},
+    };
+    static_assert(std::size(images) + std::size(buffers) == BINDING_COUNT);
+
+    std::array<VkDescriptorImageInfo, std::size(images)> imageInfos;
+    std::array<VkDescriptorBufferInfo, std::size(buffers)> bufferInfos;
+    std::array<VkWriteDescriptorSet, BINDING_COUNT> writes;
+    size_t writeCount = 0;
+    for (size_t i = 0; i < std::size(images); ++i) {
+        imageInfos[i] = {.imageView = images[i].second, .imageLayout = VK_IMAGE_LAYOUT_GENERAL};
+        writes[writeCount++] = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstBinding = images[i].first,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .pImageInfo = &imageInfos[i],
+        };
+    }
+    for (size_t i = 0; i < std::size(buffers); ++i) {
+        bufferInfos[i] = {.buffer = buffers[i].second, .range = VK_WHOLE_SIZE};
+        writes[writeCount++] = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstBinding = buffers[i].first,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pBufferInfo = &bufferInfos[i],
+        };
+    }
+    vkCmdPushDescriptorSet(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout.get(), SET_SCENE,
+                           static_cast<uint32_t>(writes.size()), writes.data());
 }
 
 void RaytracingPass::updateSampleIndex(std::vector<std::byte> frameState) {
@@ -205,13 +256,13 @@ void RaytracingPass::Record(VkCommandBuffer cmdBuffer, uint32_t frameIndex, cons
         UploadMeshes(scene.GetMeshes());
     }
     const FrameData data = EncodeFrame(scene, m_meshTable);
-    writeFrameBuffer(frame.materials, frame.descriptorSet, BINDING_MATERIALS, data.materials);
-    writeFrameBuffer(frame.spheres, frame.descriptorSet, BINDING_SPHERES, data.spheres);
-    writeFrameBuffer(frame.planes, frame.descriptorSet, BINDING_PLANES, data.planes);
-    writeFrameBuffer(frame.lights, frame.descriptorSet, BINDING_LIGHTS, data.lights);
-    writeFrameBuffer(frame.instances, frame.descriptorSet, BINDING_INSTANCES, data.instances);
-    writeFrameBuffer(frame.scenePairs, frame.descriptorSet, BINDING_SCENE_PAIRS, data.scenePairs);
-    writeFrameBuffer(frame.debugLines, frame.descriptorSet, BINDING_DEBUG_LINES, data.debugLines);
+    writeFrameBuffer(frame.materials, data.materials, "Materials");
+    writeFrameBuffer(frame.spheres, data.spheres, "Spheres");
+    writeFrameBuffer(frame.planes, data.planes, "Planes");
+    writeFrameBuffer(frame.lights, data.lights, "Lights");
+    writeFrameBuffer(frame.instances, data.instances, "Instances");
+    writeFrameBuffer(frame.scenePairs, data.scenePairs, "Scene BVH node pairs");
+    writeFrameBuffer(frame.debugLines, data.debugLines, "Debug lines");
 
     // A degenerate camera keeps the previous orientation
     const Camera& camera = scene.GetCamera();
@@ -226,7 +277,7 @@ void RaytracingPass::Record(VkCommandBuffer cmdBuffer, uint32_t frameIndex, cons
         .lightCount = static_cast<uint32_t>(data.lights.size()),
         .instanceCount = static_cast<uint32_t>(data.instances.size()),
         .maxBounces = m_maxBounces,
-        .exposure = camera.exposure,
+        .exposure = camera.exposure * m_exposure,
     };
 
     // Debug lines are drawn after accumulation, so they don't restart it
@@ -236,6 +287,7 @@ void RaytracingPass::Record(VkCommandBuffer cmdBuffer, uint32_t frameIndex, cons
     pushConstants.sampleIndex = m_sampleIndex;
     pushConstants.frameIndex = m_frameIndex++;
 
+    m_context.BeginLabel(cmdBuffer, "Raytracing");
     // The previous frame's dispatch wrote the accumulation image this one reads
     VulkanHelpers::transitionImageLayout2(cmdBuffer, m_accumulation.image(),
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
@@ -245,12 +297,14 @@ void RaytracingPass::Record(VkCommandBuffer cmdBuffer, uint32_t frameIndex, cons
 
     const VkExtent2D extent = m_output.extent();
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline.get());
+    pushSceneDescriptors(cmdBuffer, frame);
     vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout.get(),
-                            0, 1, &frame.descriptorSet, 0, nullptr);
+                            SET_TEXTURES, 1, &m_textureSet, 0, nullptr);
     vkCmdPushConstants(cmdBuffer, m_pipelineLayout.get(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                        sizeof(pushConstants), &pushConstants);
     m_timer.Begin(cmdBuffer, frameIndex);
     vkCmdDispatch(cmdBuffer, (extent.width + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE,
                   (extent.height + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE, 1);
     m_timer.End(cmdBuffer, frameIndex);
+    m_context.EndLabel(cmdBuffer);
 }

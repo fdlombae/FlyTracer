@@ -80,7 +80,7 @@ inline void RunCompute(const VulkanContext& context, const std::string& shaderNa
     for (const auto& [binding, buffer] : buffers) {
         VulkanHelpers::writeStorageBufferDescriptor(device, set, binding, buffer);
     }
-    const auto layout = VulkanHelpers::createPipelineLayout(device, setLayout.get(),
+    const auto layout = VulkanHelpers::createPipelineLayout(device, {setLayout.address(), 1},
                                                             static_cast<uint32_t>(pushConstants.size()));
     const auto pipeline = VulkanHelpers::createComputePipeline(
         device, layout.get(), ExecutableRelativePath("test_shaders/" + shaderName + ".spv").string());

@@ -1,14 +1,16 @@
 #include "VulkanRenderer.h"
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 using VulkanHelpers::check;
 
 VulkanRenderer::VulkanRenderer(SDL_Window* window, const Config& config)
     : m_window(window)
+    , m_renderScale(std::clamp(config.renderScale, kMinRenderScale, 1.0f))
     , m_context(window)
     , m_swapchain(m_context, windowPixels(), config.vsync)
-    , m_raytracing(m_context, m_swapchain.Extent(), config.shaderDir, config.maxBounces)
+    , m_raytracing(m_context, scaledExtent(), config.shaderDir, config.maxBounces)
     , m_imgui(window, m_context, m_swapchain)
 {
     for (Frame& frame : m_frames) {
@@ -38,11 +40,26 @@ VkExtent2D VulkanRenderer::windowPixels() const {
     return {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 }
 
+VkExtent2D VulkanRenderer::scaledExtent() const {
+    const auto scaled = [this](uint32_t pixels) {
+        return std::max(static_cast<uint32_t>(std::lround(static_cast<float>(pixels) * m_renderScale)), 1u);
+    };
+    return {scaled(m_swapchain.Extent().width), scaled(m_swapchain.Extent().height)};
+}
+
+void VulkanRenderer::SetRenderScale(float scale) {
+    scale = std::clamp(scale, kMinRenderScale, 1.0f);
+    if (scale == m_renderScale) return;
+    m_renderScale = scale;
+    m_context.WaitIdle();
+    m_raytracing.Resize(scaledExtent());
+}
+
 void VulkanRenderer::recreateSwapchain() {
     m_context.WaitIdle();
     m_swapchain.Recreate(windowPixels());
     m_imgui.OnSwapchainRecreated(m_swapchain);
-    m_raytracing.Resize(m_swapchain.Extent());
+    m_raytracing.Resize(scaledExtent());
     m_imagesInFlight.assign(m_swapchain.ImageCount(), VK_NULL_HANDLE);
     m_swapchainOutdated = false;
 }
@@ -90,8 +107,12 @@ void VulkanRenderer::EndFrame(const GameScene& scene) {
 
     VulkanHelpers::beginOneTimeCommands(cmdBuffer);
     m_raytracing.Record(cmdBuffer, m_currentFrame, scene);
+    m_context.BeginLabel(cmdBuffer, "Blit to swapchain");
     recordBlitToSwapchain(cmdBuffer);
+    m_context.EndLabel(cmdBuffer);
+    m_context.BeginLabel(cmdBuffer, "ImGui");
     m_imgui.Record(cmdBuffer, m_swapchain.View(m_imageIndex), m_swapchain.Extent());
+    m_context.EndLabel(cmdBuffer);
     VulkanHelpers::transitionImageLayout2(cmdBuffer, swapchainImage,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -132,7 +153,7 @@ void VulkanRenderer::EndFrame(const GameScene& scene) {
     m_currentFrame = (m_currentFrame + 1) % RaytracingPass::kFramesInFlight;
 }
 
-// The raytracer renders at the swapchain size; the blit converts RGBA to the swapchain's BGRA
+// The blit converts RGBA to the swapchain's BGRA, and stretches the image when the render scale is below 1
 void VulkanRenderer::recordBlitToSwapchain(VkCommandBuffer cmdBuffer) {
     const VkImage output = m_raytracing.Output().image();
     const VkImage swapchainImage = m_swapchain.Image(m_imageIndex);
@@ -150,14 +171,18 @@ void VulkanRenderer::recordBlitToSwapchain(VkCommandBuffer cmdBuffer) {
     const auto corner = [](VkExtent2D extent) {
         return VkOffset3D{static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height), 1};
     };
+    const VkExtent2D source = m_raytracing.Output().extent();
+    const VkExtent2D destination = m_swapchain.Extent();
+    const bool sameSize = source.width == destination.width && source.height == destination.height;
     const VkImageBlit region{
         .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-        .srcOffsets = {{}, corner(m_raytracing.Output().extent())},
+        .srcOffsets = {{}, corner(source)},
         .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-        .dstOffsets = {{}, corner(m_swapchain.Extent())},
+        .dstOffsets = {{}, corner(destination)},
     };
     vkCmdBlitImage(cmdBuffer, output, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   swapchainImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_NEAREST);
+                   swapchainImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region,
+                   sameSize ? VK_FILTER_NEAREST : VK_FILTER_LINEAR);
 
     VulkanHelpers::transitionImageLayout2(cmdBuffer, swapchainImage,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,

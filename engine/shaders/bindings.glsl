@@ -23,7 +23,7 @@ layout(binding = BINDING_INSTANCES) readonly buffer Instances { MeshInstance ins
 layout(binding = BINDING_SCENE_PAIRS, scalar) readonly buffer ScenePairs { NodePair scenePairs[]; };  // World space
 layout(binding = BINDING_DEBUG_LINES) readonly buffer DebugLines { DebugLine debugLines[]; };
 
-layout(binding = BINDING_TEXTURES) uniform sampler2D textures[MAX_TEXTURES];  // sRGB images, sampled as linear
+layout(set = SET_TEXTURES, binding = BINDING_TEXTURES) uniform sampler2D textures[MAX_TEXTURES];  // sRGB images, sampled as linear
 
 layout(push_constant) uniform PushConstants {
     vec4 cameraRotor;  // The camera motor (see CameraMotor in Camera.h): s, e23, e31, e12

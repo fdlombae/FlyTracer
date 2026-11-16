@@ -24,7 +24,17 @@ public:
 
     void WaitIdle() const;
 
+    // Names and command buffer labels show up in validation messages and in tools like RenderDoc.
+    // They do nothing without the debug utils extension.
+    template<typename Handle>
+    void SetName(VkObjectType type, Handle handle, const char* name) const {
+        setName(type, reinterpret_cast<uint64_t>(handle), name);
+    }
+    void BeginLabel(VkCommandBuffer cmdBuffer, const char* name) const;
+    void EndLabel(VkCommandBuffer cmdBuffer) const;
+
 private:
+    void setName(VkObjectType type, uint64_t handle, const char* name) const;
     void createInstance(bool withSurface);
     void selectPhysicalDevice();
     void createDevice();
@@ -32,6 +42,9 @@ private:
 
     VkInstance m_instance{VK_NULL_HANDLE};
     VkDebugUtilsMessengerEXT m_debugMessenger{VK_NULL_HANDLE};
+    PFN_vkSetDebugUtilsObjectNameEXT m_setObjectName{nullptr};
+    PFN_vkCmdBeginDebugUtilsLabelEXT m_beginLabel{nullptr};
+    PFN_vkCmdEndDebugUtilsLabelEXT m_endLabel{nullptr};
     VkSurfaceKHR m_surface{VK_NULL_HANDLE};
     VkPhysicalDevice m_physicalDevice{VK_NULL_HANDLE};
     VkDevice m_device{VK_NULL_HANDLE};

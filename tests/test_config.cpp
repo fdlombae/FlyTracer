@@ -20,7 +20,10 @@ protected:
         return config;
     }
 
-    const std::filesystem::path m_path = std::filesystem::temp_directory_path() / "flytracer_test_config.cfg";
+    // A file of its own for every test: CTest runs the tests as separate processes at the same time
+    const std::filesystem::path m_path =
+        std::filesystem::temp_directory_path() /
+        (std::string("flytracer_") + ::testing::UnitTest::GetInstance()->current_test_info()->name() + ".cfg");
 };
 
 TEST_F(ConfigTest, DefaultValues) {
@@ -43,6 +46,7 @@ TEST_F(ConfigTest, LoadFromFile) {
                                   "fullscreen=true\n"
                                   "vsync=false\n"
                                   "max_ray_bounces=8\n"
+                                  "render_scale=0.5\n"
                                   "resource_directory=test_resources\n"
                                   "unknown_key=ignored\n");
     EXPECT_EQ(config.windowWidth, 800);
@@ -51,6 +55,7 @@ TEST_F(ConfigTest, LoadFromFile) {
     EXPECT_TRUE(config.fullscreen);
     EXPECT_FALSE(config.vsync);
     EXPECT_EQ(config.maxRayBounces, 8);
+    EXPECT_FLOAT_EQ(config.renderScale, 0.5f);
     EXPECT_EQ(config.resourceDirectory, "test_resources");
 }
 
@@ -68,6 +73,7 @@ TEST_F(ConfigTest, SaveToFile) {
     config.windowHeight = 1080;
     config.windowTitle = "SavedConfig";
     config.maxRayBounces = 6;
+    config.renderScale = 0.75f;
     ASSERT_TRUE(config.saveToFile(m_path.string()));
 
     AppConfig loaded;
@@ -76,6 +82,7 @@ TEST_F(ConfigTest, SaveToFile) {
     EXPECT_EQ(loaded.windowHeight, 1080);
     EXPECT_EQ(loaded.windowTitle, "SavedConfig");
     EXPECT_EQ(loaded.maxRayBounces, 6);
+    EXPECT_FLOAT_EQ(loaded.renderScale, 0.75f);
 }
 
 TEST_F(ConfigTest, ParseWithWhitespace) {

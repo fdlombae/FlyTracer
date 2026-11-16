@@ -33,6 +33,15 @@ public:
     void UploadMeshes(const std::vector<std::unique_ptr<Mesh>>& meshes);
     // Recreates the images at a new size; the GPU must be idle
     void Resize(VkExtent2D extent);
+    // Builds the pipeline again from the compiled shader in the shader directory. Waits for the GPU;
+    // throws and keeps the current pipeline when that fails.
+    void ReloadShader();
+
+    void SetMaxBounces(uint32_t maxBounces) noexcept { m_maxBounces = maxBounces; }
+    [[nodiscard]] uint32_t MaxBounces() const noexcept { return m_maxBounces; }
+    // Multiplies the exposure of the scene's camera
+    void SetExposure(float exposure) noexcept { m_exposure = exposure; }
+    [[nodiscard]] float Exposure() const noexcept { return m_exposure; }
 
     // Updates this frame's scene data and records the dispatch.
     // The output image is in GENERAL layout before and after.
@@ -45,7 +54,6 @@ public:
 private:
     // Scene data the CPU rewrites every frame, one copy per frame in flight
     struct FrameBuffers {
-        VkDescriptorSet descriptorSet{VK_NULL_HANDLE};
         VulkanHelpers::Buffer materials;
         VulkanHelpers::Buffer spheres;
         VulkanHelpers::Buffer planes;
@@ -56,21 +64,26 @@ private:
     };
 
     void createImages(VkExtent2D extent);
-    void createDescriptors(const std::string& shaderDir);
+    void createDescriptors();
     template<typename T>
-    void writeFrameBuffer(VulkanHelpers::Buffer& buffer, VkDescriptorSet set, uint32_t binding,
-                          const std::vector<T>& data);
+    void writeFrameBuffer(VulkanHelpers::Buffer& buffer, const std::vector<T>& data, const char* name);
+    // Pushes the images, the mesh buffers and the frame's buffers into the command buffer as set SET_SCENE
+    void pushSceneDescriptors(VkCommandBuffer cmdBuffer, const FrameBuffers& frame) const;
     // Restarts accumulation when anything that affects the image changed since the last frame
     void updateSampleIndex(std::vector<std::byte> frameState);
 
     const VulkanContext& m_context;
+    std::string m_shaderPath;
     uint32_t m_maxBounces;
+    float m_exposure{1.0f};
 
     VulkanHelpers::Image m_accumulation;  // Running average of the linear radiance
     VulkanHelpers::Image m_output;        // Tone-mapped sRGB, blitted to the swapchain
 
-    VulkanHelpers::UniqueDescriptorSetLayout m_descriptorSetLayout;
+    VulkanHelpers::UniqueDescriptorSetLayout m_sceneSetLayout;    // Pushed every frame
+    VulkanHelpers::UniqueDescriptorSetLayout m_textureSetLayout;
     VulkanHelpers::UniqueDescriptorPool m_descriptorPool;
+    VkDescriptorSet m_textureSet{VK_NULL_HANDLE};
     VulkanHelpers::UniquePipelineLayout m_pipelineLayout;
     VulkanHelpers::UniquePipeline m_pipeline;
     VulkanHelpers::UniqueSampler m_sampler;

@@ -19,8 +19,11 @@ public:
     struct Config {
         bool vsync{true};
         uint32_t maxBounces{3};
+        float renderScale{1.0f};
         std::string shaderDir{"shaders"};
     };
+
+    static constexpr float kMinRenderScale = 0.25f;
 
     VulkanRenderer(SDL_Window* window, const Config& config);
     ~VulkanRenderer() noexcept;
@@ -37,6 +40,19 @@ public:
     void EndFrame(const GameScene& scene);
 
     void OnWindowResized() noexcept { m_swapchainOutdated = true; }
+
+    // The raytracer renders at the window's size in pixels times the render scale (kMinRenderScale to 1);
+    // the image is stretched over the window. Changing it waits for the GPU.
+    void SetRenderScale(float scale);
+    [[nodiscard]] float RenderScale() const noexcept { return m_renderScale; }
+    [[nodiscard]] VkExtent2D RenderExtent() const noexcept { return m_raytracing.Output().extent(); }
+    void SetMaxBounces(uint32_t maxBounces) noexcept { m_raytracing.SetMaxBounces(maxBounces); }
+    [[nodiscard]] uint32_t MaxBounces() const noexcept { return m_raytracing.MaxBounces(); }
+    void SetExposure(float exposure) noexcept { m_raytracing.SetExposure(exposure); }
+    [[nodiscard]] float Exposure() const noexcept { return m_raytracing.Exposure(); }
+    // Loads the compiled raytracing shader again; throws and keeps the current one when that fails
+    void ReloadShader() { m_raytracing.ReloadShader(); }
+
     [[nodiscard]] std::optional<double> RaytracingMilliseconds() const noexcept {
         return m_raytracing.DispatchMilliseconds();
     }
@@ -50,10 +66,12 @@ private:
     };
 
     [[nodiscard]] VkExtent2D windowPixels() const;
+    [[nodiscard]] VkExtent2D scaledExtent() const;
     void recreateSwapchain();
     void recordBlitToSwapchain(VkCommandBuffer cmdBuffer);
 
     SDL_Window* m_window;
+    float m_renderScale;
     // Declaration order is construction order; destruction runs backwards, so the context goes last
     VulkanContext m_context;
     Swapchain m_swapchain;

@@ -51,7 +51,7 @@ FetchContent_Declare(
 )
 FetchContent_Declare(
     FlyFish
-    URL https://raw.githubusercontent.com/fdlombae/FlyFish/853468cff6f63ae06643bf0ec57aa9514e1f68b5/src/FlyFish.h
+    URL https://raw.githubusercontent.com/fdlombae/FlyFish/32dd4496c8ff77dace02e900e4a8ffb5cd420ab7/include/flyfish/FlyFish.h
     DOWNLOAD_NO_EXTRACT TRUE
 )
 
@@ -119,6 +119,12 @@ add_library(FlyTracerEngine STATIC
 )
 target_link_libraries(FlyTracerEngine PUBLIC FlyTracerCore SDL3::SDL3 Vulkan::Vulkan imgui)
 target_compile_options(FlyTracerEngine PRIVATE ${NATIVE_RELEASE_OPTIONS})
+# For reloading the raytracing shader while the program runs (F5)
+target_compile_definitions(FlyTracerEngine PRIVATE
+    FLYTRACER_GLSLC="${Vulkan_GLSLC_EXECUTABLE}"
+    FLYTRACER_SHADER_SOURCE_DIR="${PROJECT_SOURCE_DIR}/engine/shaders"
+    FLYTRACER_ENGINE_INCLUDE_DIR="${PROJECT_SOURCE_DIR}/engine/include"
+)
 set_target_properties(FlyTracerEngine PROPERTIES OUTPUT_NAME flytracer_engine)
 
 # =============================================================================
@@ -128,10 +134,6 @@ set(GAME_SCENE_SOURCES
     game/src/SceneRegistry.cpp
     game/src/TestBoxScene.cpp
     game/src/DebugDemoScene.cpp
-    game/src/BiReflectionScene.cpp
-    game/src/QuaternionScene.cpp
-    game/src/PluckerScene.cpp
-    game/src/HornetScene.cpp
 )
 add_executable(${PROJECT_NAME} game/src/main.cpp ${GAME_SCENE_SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE game/include)
@@ -192,11 +194,9 @@ add_executable(FlyTracer_Test
     tests/test_input.cpp
     tests/test_mesh.cpp
     tests/test_mesh_lines.cpp
-    tests/test_mirror_solver.cpp
     tests/test_pga.cpp
     tests/test_scene_encoding.cpp
 )
-target_include_directories(FlyTracer_Test PRIVATE game/include)
 target_link_libraries(FlyTracer_Test PRIVATE FlyTracerCore GTest::gtest_main)
 gtest_discover_tests(FlyTracer_Test)
 

@@ -1,7 +1,6 @@
 # Build directories
 build*/
 cmake-build-*/
-site/
 bin/
 lib/
 
@@ -52,8 +51,8 @@ Makefile
 *.app
 FlyTracer
 
-# Shader compiled files (optional - you might want to commit these)
-# *.spv
+# Compiled shaders
+*.spv
 
 # OS files
 .DS_Store
@@ -61,7 +60,16 @@ Thumbs.db
 
 # Local tool and editor state
 .cache/
+.claude/
+.conductor/
 imgui.ini
+compile_commands.json
+CMakeUserPresets.json
+
+# Test and benchmark output: CTest logs, the image a failed golden image test rendered, benchmark results
+Testing/
+*_actual.ppm
+*.csv
 
 # Course assignment documents
 GEOA-*

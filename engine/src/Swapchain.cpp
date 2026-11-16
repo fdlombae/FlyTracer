@@ -94,6 +94,7 @@ void Swapchain::Recreate(VkExtent2D windowPixels) {
     m_extent = extent;
 
     for (VkImage image : m_images) {
+        m_context.SetName(VK_OBJECT_TYPE_IMAGE, image, "Swapchain image");
         m_views.push_back(VulkanHelpers::createImageView(device, image, m_format));
         m_renderFinished.push_back(VulkanHelpers::createSemaphore(device));
     }

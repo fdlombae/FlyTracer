@@ -117,10 +117,14 @@ using UniqueQueryPool = DeviceHandle<VkQueryPool, vkDestroyQueryPool>;
     return {device, imageView};
 }
 
+// With VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT the set is not allocated but pushed
+// into the command buffer (vkCmdPushDescriptorSet)
 [[nodiscard]] inline UniqueDescriptorSetLayout createDescriptorSetLayout(
-    VkDevice device, std::span<const VkDescriptorSetLayoutBinding> bindings) {
+    VkDevice device, std::span<const VkDescriptorSetLayoutBinding> bindings,
+    VkDescriptorSetLayoutCreateFlags flags = 0) {
     const VkDescriptorSetLayoutCreateInfo layoutInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .flags = flags,
         .bindingCount = static_cast<uint32_t>(bindings.size()),
         .pBindings = bindings.data(),
     };
@@ -158,14 +162,15 @@ using UniqueQueryPool = DeviceHandle<VkQueryPool, vkDestroyQueryPool>;
     return set;
 }
 
-// One descriptor set and push constants for the compute stage
-[[nodiscard]] inline UniquePipelineLayout createPipelineLayout(VkDevice device, VkDescriptorSetLayout setLayout,
+// Descriptor sets and push constants for the compute stage
+[[nodiscard]] inline UniquePipelineLayout createPipelineLayout(VkDevice device,
+                                                               std::span<const VkDescriptorSetLayout> setLayouts,
                                                                uint32_t pushConstantSize) {
     const VkPushConstantRange pushConstants{.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT, .size = pushConstantSize};
     const VkPipelineLayoutCreateInfo layoutInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &setLayout,
+        .setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+        .pSetLayouts = setLayouts.data(),
         .pushConstantRangeCount = 1,
         .pPushConstantRanges = &pushConstants,
     };
@@ -568,11 +573,6 @@ inline void writeImageDescriptors(VkDevice device, VkDescriptorSet set, uint32_t
         .pImageInfo = images.data(),
     };
     vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
-}
-
-inline void writeStorageImageDescriptor(VkDevice device, VkDescriptorSet set, uint32_t binding, VkImageView view) {
-    const VkDescriptorImageInfo imageInfo{.imageView = view, .imageLayout = VK_IMAGE_LAYOUT_GENERAL};
-    writeImageDescriptors(device, set, binding, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, {&imageInfo, 1});
 }
 
 [[nodiscard]] inline std::vector<char> readFile(const std::string& filename) {

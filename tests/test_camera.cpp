@@ -32,34 +32,34 @@ struct Frame {
 };
 
 Frame FrameOf(const Motor& motor) {
-    return {Coordinates(ApplyMotor(motor, TriVector(1.0f, 0.0f, 0.0f, 0.0f))),
-            Coordinates(ApplyMotor(motor, TriVector(0.0f, 1.0f, 0.0f, 0.0f))),
-            Coordinates(ApplyMotor(motor, TriVector(0.0f, 0.0f, -1.0f, 0.0f)))};
+    return {Coordinates(ApplyMotor(motor, TriVector::Direction(1.0f, 0.0f, 0.0f))),
+            Coordinates(ApplyMotor(motor, TriVector::Direction(0.0f, 1.0f, 0.0f))),
+            Coordinates(ApplyMotor(motor, TriVector::Direction(0.0f, 0.0f, -1.0f)))};
 }
 
 } // anonymous namespace
 
 // Looking down -z with y up, the camera frame is the world frame
 TEST(CameraTest, LookDownNegativeZ) {
-    const auto motor = CameraMotor(Camera{TriVector(0.0f, 0.0f, 5.0f), TriVector(0.0f, 0.0f, 0.0f),
-                                          TriVector(0.0f, 1.0f, 0.0f, 0.0f)});
+    const auto motor = CameraMotor(Camera{TriVector::Point(0.0f, 0.0f, 5.0f), TriVector::Point(0.0f, 0.0f, 0.0f),
+                                          TriVector::Direction(0.0f, 1.0f, 0.0f)});
     ASSERT_TRUE(motor.has_value());
     const Frame frame = FrameOf(*motor);
     ExpectNear(frame.right, {1.0f, 0.0f, 0.0f});
     ExpectNear(frame.up, {0.0f, 1.0f, 0.0f});
     ExpectNear(frame.forward, {0.0f, 0.0f, -1.0f});
-    ExpectNear(Coordinates(ApplyMotor(*motor, TriVector(0.0f, 0.0f, 0.0f))), {0.0f, 0.0f, 5.0f});
+    ExpectNear(Coordinates(ApplyMotor(*motor, TriVector::Point(0.0f, 0.0f, 0.0f))), {0.0f, 0.0f, 5.0f});
 }
 
 // The camera looks at the target, upright as far as the up hint allows, from the eye
 TEST(CameraTest, MotorLooksAtTheTarget) {
-    const TriVector up(0.0f, 1.0f, 0.0f, 0.0f);
+    const TriVector up = TriVector::Direction(0.0f, 1.0f, 0.0f);
     const std::array cameras{
-        Camera{TriVector(3.0f, 20.0f, 50.0f), TriVector(0.0f, 5.0f, 0.0f), TriVector(0.0f, 2.0f, 0.0f, 0.0f)},
-        Camera{TriVector(0.0f, 1.0f, -8.0f), TriVector(0.0f, 1.0f, 0.0f), up},  // Looking along +z
-        Camera{TriVector(0.0f, 1.0f, 8.0f), TriVector(0.0f, 1.0f, 0.0f), up},   // Looking along -z
-        Camera{TriVector(1.0f, 2.0f, 3.0f), TriVector(2.0f, 2.0f, 3.0f), TriVector(0.0f, -1.0f, 0.0f, 0.0f)},
-        Camera{TriVector(0.0f, 1.0f, 8.0f), TriVector(0.0f, 1.0f, 0.0f), TriVector(0.0f, -1.0f, 0.0f, 0.0f)},
+        Camera{TriVector::Point(3.0f, 20.0f, 50.0f), TriVector::Point(0.0f, 5.0f, 0.0f), TriVector::Direction(0.0f, 2.0f, 0.0f)},
+        Camera{TriVector::Point(0.0f, 1.0f, -8.0f), TriVector::Point(0.0f, 1.0f, 0.0f), up},  // Looking along +z
+        Camera{TriVector::Point(0.0f, 1.0f, 8.0f), TriVector::Point(0.0f, 1.0f, 0.0f), up},   // Looking along -z
+        Camera{TriVector::Point(1.0f, 2.0f, 3.0f), TriVector::Point(2.0f, 2.0f, 3.0f), TriVector::Direction(0.0f, -1.0f, 0.0f)},
+        Camera{TriVector::Point(0.0f, 1.0f, 8.0f), TriVector::Point(0.0f, 1.0f, 0.0f), TriVector::Direction(0.0f, -1.0f, 0.0f)},
     };
     for (const Camera& camera : cameras) {
         const auto motor = CameraMotor(camera);
@@ -71,7 +71,7 @@ TEST(CameraTest, MotorLooksAtTheTarget) {
         EXPECT_NEAR(Dot(frame.up, frame.forward), 0.0f, 1e-5f);
         EXPECT_GT(Dot(frame.up, Coordinates(camera.up)), 0.0f);
         ExpectNear(frame.right, Cross(frame.forward, frame.up));  // Right-handed
-        const TriVector eye = ApplyMotor(*motor, TriVector(0.0f, 0.0f, 0.0f));
+        const TriVector eye = ApplyMotor(*motor, TriVector::Point(0.0f, 0.0f, 0.0f));
         EXPECT_NEAR((eye - camera.eye).VNorm(), 0.0f, 1e-4f);
     }
 }
@@ -79,7 +79,7 @@ TEST(CameraTest, MotorLooksAtTheTarget) {
 // Test degenerate cameras are rejected
 // The ray through the window center goes through the target; one through the right edge leans right
 TEST(CameraTest, ViewRay) {
-    const Camera camera{TriVector(0.0f, 0.0f, 10.0f), TriVector(0.0f, 0.0f, 0.0f), TriVector(0.0f, 1.0f, 0.0f, 0.0f), 90.0f};
+    const Camera camera{TriVector::Point(0.0f, 0.0f, 10.0f), TriVector::Point(0.0f, 0.0f, 0.0f), TriVector::Direction(0.0f, 1.0f, 0.0f), 90.0f};
     const auto center = ViewRay(camera, 400.0f, 300.0f, 800.0f, 600.0f);
     ASSERT_TRUE(center.has_value());
     const TriVector closest = ClosestPointOnLine(*center, camera.target);
@@ -93,7 +93,7 @@ TEST(CameraTest, ViewRay) {
 }
 
 TEST(CameraTest, DegenerateCamera) {
-    const TriVector up(0.0f, 1.0f, 0.0f, 0.0f);
-    EXPECT_FALSE(CameraMotor(Camera{TriVector(1.0f, 2.0f, 3.0f), TriVector(1.0f, 2.0f, 3.0f), up}).has_value());
-    EXPECT_FALSE(CameraMotor(Camera{TriVector(0.0f, 5.0f, 0.0f), TriVector(0.0f, 0.0f, 0.0f), up}).has_value());
+    const TriVector up = TriVector::Direction(0.0f, 1.0f, 0.0f);
+    EXPECT_FALSE(CameraMotor(Camera{TriVector::Point(1.0f, 2.0f, 3.0f), TriVector::Point(1.0f, 2.0f, 3.0f), up}).has_value());
+    EXPECT_FALSE(CameraMotor(Camera{TriVector::Point(0.0f, 5.0f, 0.0f), TriVector::Point(0.0f, 0.0f, 0.0f), up}).has_value());
 }

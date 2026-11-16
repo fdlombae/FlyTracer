@@ -19,7 +19,8 @@ std::optional<size_t> indexOf(const std::vector<uint32_t>& ids, uint32_t id) {
 
 TriVector MeshInstance::ToWorld(const TriVector& localPoint) const {
     const TriVector p = Euclidean(localPoint);
-    const TriVector scaled(p.e032() * scale, p.e013() * scale, p.e021() * scale, p.e123());
+    TriVector scaled = p * scale;
+    scaled.e123() = p.e123();  // A point stays a point, a direction a direction
     const TriVector moved = ApplyMotor(transform, scaled);
     return mirror ? ReflectInPlane(*mirror, moved) : moved;
 }
@@ -119,15 +120,19 @@ uint32_t GameScene::AddMeshInstance(uint32_t meshId, const TriVector& position, 
 }
 
 uint32_t GameScene::AddMeshInstance(uint32_t meshId, const Motor& transform, std::string_view name) {
-    if (meshId >= m_meshes.size()) {
-        throw std::runtime_error("Invalid mesh ID: " + std::to_string(meshId));
+    return AddMeshInstance(MeshInstance{.meshId = meshId, .transform = transform, .name = std::string(name)});
+}
+
+uint32_t GameScene::AddMeshInstance(const MeshInstance& instance) {
+    if (instance.meshId >= m_meshes.size()) {
+        throw std::runtime_error("Invalid mesh ID: " + std::to_string(instance.meshId));
     }
 
     const uint32_t instanceId = m_nextInstanceId++;
-    m_meshInstances.push_back({.meshId = meshId, .transform = transform, .name = std::string(name)});
+    m_meshInstances.push_back(instance);
     m_instanceIds.push_back(instanceId);
-    if (!name.empty()) {
-        m_namedInstances[std::string(name)] = instanceId;
+    if (!instance.name.empty()) {
+        m_namedInstances[instance.name] = instanceId;
     }
     return instanceId;
 }
@@ -182,7 +187,7 @@ uint32_t GameScene::AddPlane(const Vector& plane, const Scene::Material& materia
 
 uint32_t GameScene::AddGroundPlane(float height, const Scene::Material& material) {
     // y - height = 0, facing up
-    return AddPlane(Vector(-height, 0.0f, 1.0f, 0.0f), material);
+    return AddPlane(Vector::Plane(0.0f, 1.0f, 0.0f, -height), material);
 }
 
 Scene::Sphere* GameScene::GetSphere(uint32_t id) noexcept {
@@ -243,7 +248,7 @@ void GameScene::DrawDebugLine(const BiVector& line, float halfLength, const Scen
     if (length < 1e-6f) return;  // Ideal line, nothing to draw
     const TriVector direction = LineDirection(line) * (halfLength / length);
 
-    const TriVector closest = ClosestPointOnLine(line, TriVector(0.0f, 0.0f, 0.0f));
+    const TriVector closest = ClosestPointOnLine(line, TriVector::Point(0.0f, 0.0f, 0.0f));
     DrawDebugLine(closest - direction, closest + direction, color);
 }
 
@@ -251,8 +256,8 @@ void GameScene::DrawDebugPoint(const TriVector& point, float size, const Scene::
     if (std::abs(point.e123()) < 1e-6f) return;  // Directions have no position
 
     const TriVector p = Euclidean(point);
-    for (const TriVector& axis : {TriVector(size, 0.0f, 0.0f, 0.0f), TriVector(0.0f, size, 0.0f, 0.0f),
-                                  TriVector(0.0f, 0.0f, size, 0.0f)}) {
+    for (const TriVector& axis : {TriVector::Direction(size, 0.0f, 0.0f), TriVector::Direction(0.0f, size, 0.0f),
+                                  TriVector::Direction(0.0f, 0.0f, size)}) {
         DrawDebugLine(p - axis, p + axis, color);
     }
 }
@@ -262,8 +267,8 @@ void GameScene::DrawDebugAxes(const TriVector& position, float size) {
 }
 
 void GameScene::DrawDebugAxes(const Motor& transform, float size) {
-    const TriVector origin = ApplyMotor(transform, TriVector(0.0f, 0.0f, 0.0f));
-    DrawDebugLine(origin, ApplyMotor(transform, TriVector(size, 0.0f, 0.0f)), Scene::Color::Red());
-    DrawDebugLine(origin, ApplyMotor(transform, TriVector(0.0f, size, 0.0f)), Scene::Color::Green());
-    DrawDebugLine(origin, ApplyMotor(transform, TriVector(0.0f, 0.0f, size)), Scene::Color::Blue());
+    const TriVector origin = ApplyMotor(transform, TriVector::Point(0.0f, 0.0f, 0.0f));
+    DrawDebugLine(origin, ApplyMotor(transform, TriVector::Point(size, 0.0f, 0.0f)), Scene::Color::Red());
+    DrawDebugLine(origin, ApplyMotor(transform, TriVector::Point(0.0f, size, 0.0f)), Scene::Color::Green());
+    DrawDebugLine(origin, ApplyMotor(transform, TriVector::Point(0.0f, 0.0f, size)), Scene::Color::Blue());
 }

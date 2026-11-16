@@ -18,7 +18,7 @@ protected:
 private:
     static constexpr float kPi = std::numbers::pi_v<float>;
 
-    OrbitCamera m_orbit{TriVector(0.0f, 15.0f, 0.0f)};
+    OrbitCamera m_orbit{TriVector::Point(0.0f, 15.0f, 0.0f)};
 
     // Sphere rotation
     uint32_t m_sphere1Id{0};

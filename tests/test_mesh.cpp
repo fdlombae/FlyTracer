@@ -33,8 +33,8 @@ TEST_F(MeshTest, DefaultConstruction) {
 TEST_F(MeshTest, AddVertex) {
     Vertex v;
     // Position: TriVector uses e032=x, e013=y, e021=z, e123=w
-    v.position = TriVector(1.0f, 2.0f, 3.0f, 1.0f);
-    v.normal = TriVector(0.0f, 0.0f, 1.0f, 0.0f);
+    v.position = TriVector::Point(1.0f, 2.0f, 3.0f);
+    v.normal = TriVector::Direction(0.0f, 0.0f, 1.0f);
     v.texCoord[0] = 0.5f;
     v.texCoord[1] = 0.5f;
 
@@ -48,7 +48,7 @@ TEST_F(MeshTest, AddVertex) {
 
 TEST_F(MeshTest, AddTriangle) {
     for (int i = 0; i < 3; ++i) {
-        mesh.AddVertex({.position = TriVector(static_cast<float>(i), 0.0f, 0.0f, 1.0f)});
+        mesh.AddVertex({.position = TriVector::Point(static_cast<float>(i), 0.0f, 0.0f)});
     }
 
     mesh.AddTriangle({{0, 1, 2}, 0});
@@ -95,7 +95,7 @@ TEST_F(MeshTest, HasMaterial) {
 
 // Triangles wound counter-clockwise seen from outside, as in OBJ files, get outward normals
 TEST_F(MeshTest, ComputeNormals) {
-    for (const TriVector& p : {TriVector(0.0f, 0.0f, 0.0f), TriVector(1.0f, 0.0f, 0.0f), TriVector(0.0f, 1.0f, 0.0f)}) {
+    for (const TriVector& p : {TriVector::Point(0.0f, 0.0f, 0.0f), TriVector::Point(1.0f, 0.0f, 0.0f), TriVector::Point(0.0f, 1.0f, 0.0f)}) {
         mesh.AddVertex({.position = p});
     }
     mesh.AddTriangle(Triangle{{0, 1, 2}, 0});
@@ -113,8 +113,8 @@ TEST_F(MeshTest, ComputeNormals) {
 // A vertex normal weighs its faces by their angle at the vertex: the corner of a right-angled
 // and a 45 degree triangle meeting at a fold
 TEST_F(MeshTest, ComputeNormalsWeighsByAngle) {
-    for (const TriVector& p : {TriVector(0.0f, 0.0f, 0.0f), TriVector(1.0f, 0.0f, 0.0f), TriVector(0.0f, 1.0f, 0.0f),
-                               TriVector(1.0f, 0.0f, -1.0f)}) {
+    for (const TriVector& p : {TriVector::Point(0.0f, 0.0f, 0.0f), TriVector::Point(1.0f, 0.0f, 0.0f), TriVector::Point(0.0f, 1.0f, 0.0f),
+                               TriVector::Point(1.0f, 0.0f, -1.0f)}) {
         mesh.AddVertex({.position = p});
     }
     mesh.AddTriangle(Triangle{{0, 1, 2}, 0});  // Normal +z, 90 degrees at vertex 0
@@ -129,7 +129,7 @@ TEST_F(MeshTest, ComputeNormalsWeighsByAngle) {
 
 // Like the flipped OBJ v, generated v is 0 at the top, where image row 0 is
 TEST_F(MeshTest, CylindricalUVsStartAtTheTop) {
-    for (const TriVector& p : {TriVector(1.0f, 0.0f, 0.0f), TriVector(1.0f, 2.0f, 0.0f)}) {
+    for (const TriVector& p : {TriVector::Point(1.0f, 0.0f, 0.0f), TriVector::Point(1.0f, 2.0f, 0.0f)}) {
         mesh.AddVertex({.position = p});
     }
 
@@ -140,7 +140,7 @@ TEST_F(MeshTest, CylindricalUVsStartAtTheTop) {
 }
 
 TEST_F(MeshTest, StandOnOrigin) {
-    for (const TriVector& p : {TriVector(1.0f, 2.0f, 3.0f), TriVector(3.0f, 6.0f, 7.0f)}) {
+    for (const TriVector& p : {TriVector::Point(1.0f, 2.0f, 3.0f), TriVector::Point(3.0f, 6.0f, 7.0f)}) {
         mesh.AddVertex({.position = p});
     }
 
@@ -238,7 +238,7 @@ TEST_F(MeshTest, BuildBVH) {
     for (int i = 0; i < 100; ++i) {
         const auto first = static_cast<uint32_t>(mesh.VertexCount());
         for (const auto& [dx, dy] : {std::pair{0.0f, 0.0f}, std::pair{0.5f, 0.0f}, std::pair{0.0f, 0.5f}}) {
-            mesh.AddVertex({.position = TriVector(static_cast<float>(i) + dx, dy, 0.0f)});
+            mesh.AddVertex({.position = TriVector::Point(static_cast<float>(i) + dx, dy, 0.0f)});
         }
         mesh.AddTriangle({{first, first + 1, first + 2}});
     }
@@ -256,12 +256,12 @@ namespace {
 
 // Corners wound counter-clockwise seen from outside, as in OBJ
 Mesh MakeTetrahedron() {
-    return MakeMesh({TriVector(0, 0, 0), TriVector(1, 0, 0), TriVector(0, 1, 0), TriVector(0, 0, 1)},
+    return MakeMesh({TriVector::Point(0, 0, 0), TriVector::Point(1, 0, 0), TriVector::Point(0, 1, 0), TriVector::Point(0, 0, 1)},
                     {{0, 2, 1}, {0, 1, 3}, {0, 3, 2}, {1, 2, 3}});
 }
 
-const Motor kScrew = TranslationMotor(3.0f, -2.0f, 5.0f) *
-                     Motor::Rotation(40.0f, TriVector(1.0f, 0.0f, 0.0f) & TriVector(0.0f, 2.0f, 1.0f));
+const Motor kScrew = Motor::Translation(3.0f, -2.0f, 5.0f) *
+                     Motor::Rotation(Angle::FromDegrees(40.0f), TriVector::Point(1.0f, 0.0f, 0.0f) & TriVector::Point(0.0f, 2.0f, 1.0f));
 
 } // anonymous namespace
 
@@ -277,7 +277,7 @@ TEST(MeshMeasuresTest, TetrahedronCenterOfMass) {
 }
 
 TEST(MeshMeasuresTest, ReversedWindingNegatesVolume) {
-    const Mesh mesh = MakeMesh({TriVector(0, 0, 0), TriVector(1, 0, 0), TriVector(0, 1, 0), TriVector(0, 0, 1)},
+    const Mesh mesh = MakeMesh({TriVector::Point(0, 0, 0), TriVector::Point(1, 0, 0), TriVector::Point(0, 1, 0), TriVector::Point(0, 0, 1)},
                                {{0, 1, 2}, {0, 3, 1}, {0, 2, 3}, {1, 3, 2}});
     EXPECT_NEAR(mesh.Volume(), -1.0f / 6.0f, 1e-6f);
 }
@@ -287,7 +287,7 @@ TEST(MeshMeasuresTest, BoxMeasuresFollowItsMotor) {
     const Mesh box = MakeBox(2.0f, 3.0f, 4.0f, kScrew);
     EXPECT_NEAR(box.Volume(), 24.0f, 1e-3f);
     const TriVector center = box.CenterOfMass();
-    const TriVector expected = ApplyMotor(kScrew, TriVector(0.0f, 0.0f, 0.0f));
+    const TriVector expected = ApplyMotor(kScrew, TriVector::Point(0.0f, 0.0f, 0.0f));
     EXPECT_NEAR(center.e032(), expected.e032(), 1e-4f);
     EXPECT_NEAR(center.e013(), expected.e013(), 1e-4f);
     EXPECT_NEAR(center.e021(), expected.e021(), 1e-4f);
@@ -298,7 +298,7 @@ TEST(MeshMeasuresTest, BoxPrincipalInertia) {
     const std::array<float, 3> sizes{2.0f, 3.0f, 4.0f};
     const PrincipalInertia inertia = MakeBox(sizes[0], sizes[1], sizes[2], kScrew).Inertia();
     const float volume = sizes[0] * sizes[1] * sizes[2];
-    const std::array<TriVector, 3> axes{TriVector(1, 0, 0, 0), TriVector(0, 1, 0, 0), TriVector(0, 0, 1, 0)};
+    const std::array<TriVector, 3> axes{TriVector::Direction(1, 0, 0), TriVector::Direction(0, 1, 0), TriVector::Direction(0, 0, 1)};
 
     for (size_t i = 0; i < 3; ++i) {
         const TriVector principalAxis = ApplyMotor(inertia.rotor, axes[i]);
