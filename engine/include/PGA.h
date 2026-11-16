@@ -15,11 +15,6 @@ using flyfish::Vector;
 // Small helpers on top of FlyFish. Every transformation is a sandwich product X' = V X ~V; the
 // shaders use FlyFish's operations through engine/shaders/flyfish.glsl.
 
-// Motor translating the origin to the given point
-[[nodiscard]] inline Motor TranslationMotor(const TriVector& position) noexcept {
-    return Motor::Translation(position.e032(), position.e013(), position.e021());
-}
-
 // Motor that reflects in plane `first` and then in plane `second`: the geometric product second * first
 [[nodiscard]] inline Motor ReflectionMotor(const Vector& first, const Vector& second) noexcept {
     return second * first;
@@ -60,7 +55,7 @@ using flyfish::Vector;
 // Motor translating the origin to the given point (of any weight)
 [[nodiscard]] inline Motor TranslationMotor(const TriVector& position) noexcept {
     const TriVector p = Euclidean(position);
-    return TranslationMotor(p.e032(), p.e013(), p.e021());
+    return Motor::Translation(p.e032(), p.e013(), p.e021());
 }
 
 // The direction of a line, its (e23, e31, e12) part, as an ideal point

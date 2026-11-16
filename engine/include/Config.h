@@ -43,6 +43,7 @@ bool parseNumber(std::string_view str, T& out, T min, T max) noexcept {
 struct AppConfig {
     static constexpr int kMaxWindowSize{16384};
     static constexpr int kMaxRayBounces{32};
+    static constexpr float kMinRenderScale{0.25f};
 
     // Window settings
     int windowWidth{1280};
@@ -116,7 +117,7 @@ private:
         else if (key == "fullscreen") fullscreen = flag;
         else if (key == "vsync") vsync = flag;
         else if (key == "max_ray_bounces") parseNumber(value, maxRayBounces, 1, kMaxRayBounces);
-        else if (key == "render_scale") parseNumber(value, renderScale);
+        else if (key == "render_scale") parseNumber(value, renderScale, kMinRenderScale, 1.0f);
         else if (key == "resource_directory") resourceDirectory = value;
         else if (key == "shader_directory") shaderDirectory = value;
     }

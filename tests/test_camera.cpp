@@ -100,10 +100,10 @@ TEST(CameraTest, DegenerateCamera) {
 
 // A zero or non-finite up hint has no camera frame, so the renderer keeps its previous camera
 TEST(CameraTest, InvalidUpHint) {
-    const TriVector eye(0.0f, 0.0f, 5.0f);
-    const TriVector target(0.0f, 0.0f, 0.0f);
+    const TriVector eye = TriVector::Point(0.0f, 0.0f, 5.0f);
+    const TriVector target = TriVector::Point(0.0f, 0.0f, 0.0f);
     const float nan = std::nanf("");
-    EXPECT_FALSE(CameraMotor(Camera{eye, target, TriVector(0.0f, 0.0f, 0.0f, 0.0f)}).has_value());
-    EXPECT_FALSE(CameraMotor(Camera{eye, target, TriVector(nan, 1.0f, 0.0f, 0.0f)}).has_value());
-    EXPECT_FALSE(CameraMotor(Camera{TriVector(nan, 0.0f, 5.0f), target, TriVector(0.0f, 1.0f, 0.0f, 0.0f)}).has_value());
+    EXPECT_FALSE(CameraMotor(Camera{eye, target, TriVector::Direction(0.0f, 0.0f, 0.0f)}).has_value());
+    EXPECT_FALSE(CameraMotor(Camera{eye, target, TriVector::Direction(nan, 1.0f, 0.0f)}).has_value());
+    EXPECT_FALSE(CameraMotor(Camera{TriVector::Point(nan, 0.0f, 5.0f), target, TriVector::Direction(0.0f, 1.0f, 0.0f)}).has_value());
 }

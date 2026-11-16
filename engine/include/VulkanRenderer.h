@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "GameScene.h"
 #include "ImGuiLayer.h"
 #include "RaytracingPass.h"
@@ -23,7 +24,7 @@ public:
         std::string shaderDir{"shaders"};
     };
 
-    static constexpr float kMinRenderScale = 0.25f;
+    static constexpr float kMinRenderScale = FlyTracer::AppConfig::kMinRenderScale;
 
     VulkanRenderer(SDL_Window* window, const Config& config);
     ~VulkanRenderer() noexcept;

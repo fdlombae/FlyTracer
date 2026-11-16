@@ -16,10 +16,7 @@ protected:
         return config;
     }
 
-    // A file of its own for every test: CTest runs the tests as separate processes at the same time
-    const std::filesystem::path m_path =
-        std::filesystem::temp_directory_path() /
-        (std::string("flytracer_") + ::testing::UnitTest::GetInstance()->current_test_info()->name() + ".cfg");
+    const TempFile m_file{".cfg"};
 };
 
 TEST_F(ConfigTest, DefaultValues) {

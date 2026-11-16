@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
             } else if (arg == "--no-vsync") {
                 config.vsync = false;
             } else if (arg == "--render-scale" && i + 1 < argc) {
-                if (!FlyTracer::parseNumber(argv[++i], config.renderScale)) {
+                if (!FlyTracer::parseNumber(argv[++i], config.renderScale, FlyTracer::AppConfig::kMinRenderScale, 1.0f)) {
                     std::cerr << "Invalid render scale, using default\n";
                 }
             } else if (arg == "--benchmark") {

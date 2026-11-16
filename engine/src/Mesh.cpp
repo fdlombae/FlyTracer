@@ -267,7 +267,8 @@ float Mesh::Volume() const {
 // centroids from the apex are summed, so the result does not depend on the size or position of the solid.
 TriVector Mesh::CenterOfMass() const {
     const TriVector apex = boundsCenter(*this);
-    TriVector weightedSum = TriVector::Direction(0.0f, 0.0f, 0.0f);
+    TriVector weightedOffset = TriVector::Direction(0.0f, 0.0f, 0.0f);
+    float totalVolume = 0.0f;
     forEachTetrahedron(*this, apex, [&](const TriVector& p0, const TriVector& p1, const TriVector& p2, float volume) {
         weightedOffset += (p0 + p1 + p2 - apex * 3.0f) * volume;
         totalVolume += volume;

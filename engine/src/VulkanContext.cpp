@@ -98,24 +98,11 @@ int deviceTypeScore(VkPhysicalDeviceType type) {
     }
 }
 
-// What createDevice enables, and the swapchain extension when presenting; empty when nothing is missing
-std::string missingRequirement(VkPhysicalDevice device, bool presents) {
-    VkPhysicalDeviceVulkan13Features vulkan13Features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
-    VkPhysicalDeviceVulkan12Features vulkan12Features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-                                                      .pNext = &vulkan13Features};
-    VkPhysicalDeviceFeatures2 features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, .pNext = &vulkan12Features};
-    vkGetPhysicalDeviceFeatures2(device, &features);
-    if (!vulkan12Features.scalarBlockLayout) return "scalar block layout";
-    if (!vulkan12Features.shaderSampledImageArrayNonUniformIndexing) return "non-uniform sampled image indexing";
-    if (!vulkan13Features.synchronization2) return "synchronization2";
-    if (!vulkan13Features.dynamicRendering) return "dynamic rendering";
-
+bool hasSwapchainExtension(VkPhysicalDevice device) {
     const auto extensions = enumerate<VkExtensionProperties>(vkEnumerateDeviceExtensionProperties, device, nullptr);
-    const bool hasSwapchain = std::ranges::any_of(extensions, [](const VkExtensionProperties& extension) {
+    return std::ranges::any_of(extensions, [](const VkExtensionProperties& extension) {
         return std::string_view(extension.extensionName) == VK_KHR_SWAPCHAIN_EXTENSION_NAME;
     });
-    if (presents && !hasSwapchain) return VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-    return {};
 }
 
 } // anonymous namespace
@@ -275,8 +262,8 @@ void VulkanContext::selectPhysicalDevice() {
             std::cerr << '\n';
             continue;
         }
-        if (const std::string missing = missingRequirement(device, m_surface != VK_NULL_HANDLE); !missing.empty()) {
-            std::cerr << "Skipping " << properties.deviceName << ": no " << missing << "\n";
+        if (m_surface != VK_NULL_HANDLE && !hasSwapchainExtension(device)) {
+            std::cerr << properties.deviceName << " cannot present: no " << VK_KHR_SWAPCHAIN_EXTENSION_NAME << '\n';
             continue;
         }
 

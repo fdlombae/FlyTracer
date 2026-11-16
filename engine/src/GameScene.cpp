@@ -166,9 +166,6 @@ uint32_t GameScene::AddMeshInstance(const MeshInstance& instance) {
     const uint32_t instanceId = m_nextInstanceId++;
     m_meshInstances.push_back(instance);
     m_instanceIds.push_back(instanceId);
-    if (!instance.name.empty()) {
-        m_namedInstances[instance.name] = instanceId;
-    }
     return instanceId;
 }
 

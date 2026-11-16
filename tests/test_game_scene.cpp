@@ -82,8 +82,8 @@ TEST_F(GameSceneTest, RemovedInstanceNameIsForgotten) {
 }
 
 TEST_F(GameSceneTest, FindInstanceGivesTheLastWithTheName) {
-    scene.AddMeshInstance(meshId, TriVector(1.0f, 0.0f, 0.0f), "bird");
-    const uint32_t second = scene.AddMeshInstance(meshId, TriVector(2.0f, 0.0f, 0.0f), "bird");
+    scene.AddMeshInstance(meshId, TriVector::Point(1.0f, 0.0f, 0.0f), "bird");
+    const uint32_t second = scene.AddMeshInstance(meshId, TriVector::Point(2.0f, 0.0f, 0.0f), "bird");
     EXPECT_EQ(scene.FindInstance("bird"), scene.GetInstance(second));
     EXPECT_EQ(scene.FindInstance(""), nullptr);
 
@@ -113,11 +113,11 @@ TEST_F(GameSceneTest, InvalidMeshesAreRejected) {
     EXPECT_THROW(scene.AddMesh(std::move(missingMaterial)), std::invalid_argument);
 
     auto idealVertex = makeTriangle();
-    idealVertex->AddVertex({.position = TriVector(0.0f, 0.0f, 1.0f, 0.0f)});
+    idealVertex->AddVertex({.position = TriVector::Direction(0.0f, 0.0f, 1.0f)});
     EXPECT_THROW(scene.AddMesh(std::move(idealVertex)), std::invalid_argument);
 
     auto nanVertex = makeTriangle();
-    nanVertex->AddVertex({.position = TriVector(std::nanf(""), 0.0f, 0.0f)});
+    nanVertex->AddVertex({.position = TriVector::Point(std::nanf(""), 0.0f, 0.0f)});
     EXPECT_THROW(scene.AddMesh(std::move(nanVertex)), std::invalid_argument);
 
     EXPECT_EQ(scene.GetMeshes().size(), 1u);

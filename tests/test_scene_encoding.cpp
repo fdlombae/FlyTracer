@@ -97,7 +97,7 @@ TEST(SceneEncodingTest, OnlyDrawableInstancesAreEncoded) {
         std::numeric_limits<float>::quiet_NaN();
     scene.GetInstance(scene.AddMeshInstance(meshId, TriVector::Point(7.0f, 0.0f, 0.0f)))->visible = false;
     scene.AddMeshInstance(meshId, Motor{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f});
-    scene.AddMeshInstance(meshId, TranslationMotor(std::numeric_limits<float>::infinity(), 0.0f, 0.0f));
+    scene.AddMeshInstance(meshId, Motor::Translation(std::numeric_limits<float>::infinity(), 0.0f, 0.0f));
     const MeshTable table = EncodeMeshes(scene.GetMeshes(), 64).table;
     // A mesh added after the meshes were encoded has no buffers yet
     scene.AddMeshInstance(scene.AddMesh(makeBox(Scene::Color::White())), TriVector::Point(3.0f, 0.0f, 0.0f));
@@ -123,8 +123,8 @@ TEST(SceneEncodingTest, TopLevelLeavesCoverEveryInstanceOnce) {
 
 TEST(SceneEncodingTest, InvalidPlanesAndLightsAreRejected) {
     const float nan = std::numeric_limits<float>::quiet_NaN();
-    EXPECT_THROW((void)Gpu::Encode(Scene::Plane{Vector(1.0f, 0.0f, 0.0f, 0.0f), {}}, 0), std::invalid_argument);
-    EXPECT_THROW((void)Gpu::Encode(Scene::Plane{Vector(0.0f, nan, 1.0f, 0.0f), {}}, 0), std::invalid_argument);
-    EXPECT_THROW((void)Gpu::Encode(Scene::Light::Directional(TriVector(nan, -1.0f, 0.0f, 0.0f), Scene::Color::White(), 1.0f)),
-                 std::invalid_argument);
+    EXPECT_THROW((void)Gpu::Encode(Scene::Plane{Vector::Plane(0.0f, 0.0f, 0.0f, 1.0f), {}}, 0), std::invalid_argument);
+    EXPECT_THROW((void)Gpu::Encode(Scene::Plane{Vector::Plane(nan, 1.0f, 0.0f, 0.0f), {}}, 0), std::invalid_argument);
+    const TriVector nanDirection = TriVector::Direction(nan, -1.0f, 0.0f);
+    EXPECT_THROW((void)Gpu::Encode(Scene::Light::Directional(nanDirection, Scene::Color::White(), 1.0f)), std::invalid_argument);
 }
