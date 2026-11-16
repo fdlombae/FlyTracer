@@ -53,6 +53,7 @@ FetchContent_Declare(
     FlyFish
     URL https://raw.githubusercontent.com/fdlombae/FlyFish/32dd4496c8ff77dace02e900e4a8ffb5cd420ab7/include/flyfish/FlyFish.h
     DOWNLOAD_NO_EXTRACT TRUE
+    SOURCE_DIR ${FETCHCONTENT_BASE_DIR}/flyfish-src/flyfish
 )
 
 set(SDL_SHARED ON CACHE BOOL "" FORCE)
@@ -83,8 +84,10 @@ target_include_directories(imgui SYSTEM PUBLIC
 )
 target_link_libraries(imgui PUBLIC SDL3::SDL3 Vulkan::Vulkan)
 
+# Included as <flyfish/FlyFish.h>, as in FlyFish's include directory
 add_library(FlyFish INTERFACE)
-target_include_directories(FlyFish SYSTEM INTERFACE ${flyfish_SOURCE_DIR})
+cmake_path(GET flyfish_SOURCE_DIR PARENT_PATH FLYFISH_INCLUDE_DIR)
+target_include_directories(FlyFish SYSTEM INTERFACE ${FLYFISH_INCLUDE_DIR})
 
 set(NATIVE_RELEASE_OPTIONS $<$<AND:$<CXX_COMPILER_ID:GNU,Clang,AppleClang>,$<CONFIG:Release>>:-march=native>)
 

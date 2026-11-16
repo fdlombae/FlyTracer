@@ -62,7 +62,7 @@ FLYTRACER_GPU_VALIDATION=1 ./build-debug/bin/FlyTracer
 cmake -B build -G "Visual Studio 17 2022"
 ```
 
-Requires: CMake 3.20+, C++23 compiler, Vulkan SDK 1.4 with `glslc` shader compiler. On macOS the KosmicKrisp driver (SDK 1.4.363+, Apple Silicon, macOS 26+) is required; MoltenVK is not supported. Dependencies (SDL3, tinyobjloader, Dear ImGui, Google Test, FlyFish) are fetched automatically via CMake FetchContent. Only `FlyFish.h` is downloaded, pinned to the commit of v2.0.0 in `CMakeLists.txt`; use `-DFETCHCONTENT_SOURCE_DIR_FLYFISH=<FlyFish>/include/flyfish` to build against a local FlyFish checkout.
+Requires: CMake 3.20+, C++23 compiler, Vulkan SDK 1.4 with `glslc` shader compiler. On macOS the KosmicKrisp driver (SDK 1.4.363+, Apple Silicon, macOS 26+) is required; MoltenVK is not supported. Dependencies (SDL3, tinyobjloader, Dear ImGui, Google Test, FlyFish) are fetched automatically via CMake FetchContent. Only `FlyFish.h` is downloaded, pinned to the commit of v2.0.0 in `CMakeLists.txt`, into `_deps/flyfish-src/flyfish` (included as `<flyfish/FlyFish.h>`, as in FlyFish itself); use `-DFETCHCONTENT_SOURCE_DIR_FLYFISH=<FlyFish>/include/flyfish` to build against a local FlyFish checkout.
 
 ## Architecture
 

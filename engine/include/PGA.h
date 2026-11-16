@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FlyFish.h"
+#include <flyfish/FlyFish.h>
 #include <cmath>
 #include <string>
 
